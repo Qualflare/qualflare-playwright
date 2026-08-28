@@ -261,7 +261,14 @@ export function buildCase(
 
   // Playwright's own tags (@-tokens in titles, plus describe/test `tag`
   // options) merged with anything qualflare.tag() added.
-  const tags = capTags([...test.tags, ...meta.tags]);
+  //
+  // Read defensively because `TestCase.tags` only exists from Playwright
+  // 1.42; on 1.40/1.41 it is undefined and spreading it would throw. Rather
+  // than raise the peer floor and hard-block those users, they simply get no
+  // native tags — a concept their Playwright does not have anyway — while
+  // qualflare.tag() keeps working. Verified against 1.40.0's shipped types.
+  const nativeTags = (test as { tags?: string[] }).tags ?? [];
+  const tags = capTags([...nativeTags, ...meta.tags]);
   const error = formatError(final);
 
   return {

@@ -26,7 +26,7 @@ jobs:
 
   integration:
     name: Integration (real playwright run) — playwright ${{ matrix.playwright }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     needs: unit
     strategy:
       fail-fast: false
@@ -39,13 +39,22 @@ jobs:
         #
         # Node varies with the leg because Playwright moved its own floor from
         # Node 18 to Node 20 in 1.62.
+        # `os` varies too: `playwright install --with-deps` shells out to a
+        # distro-detection script baked into each Playwright release, and
+        # 1.40 (Nov 2023) predates the current ubuntu-latest image — it exits
+        # 100 on an Ubuntu it has never heard of. Pinning the old leg to the
+        # runner it shipped against tests the package rather than Playwright's
+        # own installer.
         include:
           - playwright: '1.40.0'
             node: '20'
+            os: ubuntu-22.04
           - playwright: '1.50.0'
             node: '20'
+            os: ubuntu-latest
           - playwright: '1.62.1'
             node: '22'
+            os: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

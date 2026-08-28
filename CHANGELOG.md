@@ -33,3 +33,6 @@ Initial public release.
   allowlist. See `docs/LIMITATIONS.md`.
 - `pw:api` and `fixture` steps are filtered out by default (`includeApiSteps`); a failed one is
   always kept.
+- Playwright-native tags require Playwright 1.42+ (`TestCase.tags` does not exist before that).
+  On 1.40/1.41 the reporter reports no native tags rather than refusing to install;
+  `qualflare.tag()` works throughout.
