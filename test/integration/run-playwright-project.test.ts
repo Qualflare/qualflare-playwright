@@ -6,7 +6,6 @@ import { fileURLToPath } from 'node:url';
 import { execa } from 'execa';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const playwrightVersion: string = JSON.parse(
   fs.readFileSync(new URL('../../node_modules/@playwright/test/package.json', import.meta.url), 'utf8'),
 ).version;
