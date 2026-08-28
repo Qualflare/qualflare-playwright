@@ -30,12 +30,17 @@ export interface QualflarePlaywrightOptions {
    * step count several-fold for suites with global per-step instrumentation
    * hooks (e.g. a screenshot-after-every-step hook), which is noisy as a
    * default but valuable as an explicit opt-in. */
-  /** Include Playwright's own `pw:api` steps (every `page.click()`,
-   * `locator.fill()`, ...) as reported Steps. Off by default: a single
-   * browser test routinely produces hundreds of them, which buries the
-   * user-authored `test.step()`/`expect` boundaries that are actually
-   * legible in a report and blows through MAX_STEPS_PER_TEST_ATTEMPT on
-   * noise. A step that FAILED is always kept regardless of this setting. */
+  /** Include Playwright's runner-internal steps — `pw:api` (every
+   * `page.click()`, `locator.fill()`, ...) and `fixture` (the implicit
+   * `browser`/`context`/`page` setup every browser test opens with) — as
+   * reported Steps.
+   *
+   * Off by default: a single browser test routinely produces hundreds of
+   * them, which buries the user-authored `test.step()`/`expect` boundaries
+   * that are actually legible in a report and blows through
+   * MAX_STEPS_PER_TEST_ATTEMPT on noise. A step that FAILED is always kept
+   * regardless of this setting, since a failing API call or fixture is
+   * usually the single most useful line in the trace. */
   includeApiSteps?: boolean;
   maxAttachmentBytes?: number;
   maxTotalAttachmentBytes?: number;

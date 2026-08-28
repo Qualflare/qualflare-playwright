@@ -27,11 +27,13 @@ const MAX_STEP_DEPTH = 10;
 
 /** True when a step is worth reporting at all.
  *
- * `pw:api` is excluded by default and this is the single most important
- * filter in the mapper: one `page.goto()` plus a handful of assertions can
- * emit hundreds of `pw:api` steps, which would bury the user-authored
- * `test.step()` boundaries and exhaust MAX_STEPS_PER_TEST_ATTEMPT on noise
- * long before reaching anything a human wants to read.
+ * `pw:api` and `fixture` are excluded by default and this is the single most
+ * important filter in the mapper: one `page.goto()` plus a handful of
+ * assertions can emit hundreds of `pw:api` steps, and every browser test
+ * opens with `Fixture "browser"`/`"context"`/`"page"` before reaching a line
+ * of user code. Together they bury the user-authored `test.step()`
+ * boundaries and exhaust MAX_STEPS_PER_TEST_ATTEMPT on noise long before
+ * reaching anything a human wants to read.
  *
  * A step that FAILED is always kept, whatever its category — the failing
  * `pw:api` call is usually the single most useful line in the whole trace,
@@ -45,9 +47,16 @@ function isReportable(step: TestStep, includeApiSteps: boolean): boolean {
     case CATEGORY_TEST_STEP:
     case CATEGORY_EXPECT:
     case CATEGORY_HOOK:
-    case CATEGORY_FIXTURE:
       return true;
     case CATEGORY_PW_API:
+    case CATEGORY_FIXTURE:
+      // Both are runner internals rather than anything the test author
+      // wrote. Every browser test emits `Fixture "browser"` / `"context"` /
+      // `"page"` before reaching a single line of user code, and `pw:api`
+      // runs to hundreds of entries — in a test-management report that is
+      // noise ahead of signal. A FAILED fixture is still kept, by the check
+      // above: a fixture that throws is a genuine failure and usually the
+      // most useful line in the trace.
       return includeApiSteps;
     default:
       // An unrecognized category is most likely a third-party integration's

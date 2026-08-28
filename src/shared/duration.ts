@@ -1,7 +1,6 @@
 import type { NanosecondDuration } from './types.js';
 
 const NS_PER_MS = 1_000_000;
-const NS_PER_SECOND = 1_000_000_000;
 
 /**
  * Converts a plain millisecond duration (e.g. from `Date.now()` deltas used

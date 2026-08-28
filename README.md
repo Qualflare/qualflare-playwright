@@ -1,0 +1,139 @@
+# @qualflare/playwright
+
+[![npm version](https://img.shields.io/npm/v/%40qualflare%2Fplaywright.svg)](https://www.npmjs.com/package/@qualflare/playwright)
+[![CI](https://github.com/Qualflare/qualflare-playwright/actions/workflows/ci.yml/badge.svg)](https://github.com/Qualflare/qualflare-playwright/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
+
+A native Playwright reporter for [Qualflare](https://qualflare.com) — captures test results directly
+from your `playwright test` run: status, real retry counts and flakiness, nested `test.step()` trees,
+screenshots, videos, and author-facing metadata (labels, links, tags, priority, custom attachments).
+
+The reporter itself makes **no network calls**. It writes a report directory, and
+[`qualflare-cli`](https://github.com/Qualflare/qualflare-cli) uploads it — which is what lets any
+number of sharded CI jobs merge into a single Launch.
+
+## Install
+
+```sh
+npm install --save-dev @qualflare/playwright
+```
+
+Requires `@playwright/test` `>=1.40.0` (installed separately as a peer dependency) and Node `>=18`
+(Playwright 1.62+ itself requires Node `>=20`). You also need
+[`@qualflare/cli`](https://github.com/Qualflare/qualflare-cli) **v0.1.17 or newer** to upload what
+this reporter writes.
+
+The peer range is deliberately open-ended rather than capped at a known-good version, so a new
+Playwright release never hard-blocks `npm install` for you. 1.40, 1.50 and 1.62 are exercised in CI
+against a real `playwright test` run; newer versions are untested but not refused — please
+[open an issue](https://github.com/Qualflare/qualflare-playwright/issues) if one misbehaves.
+
+## Quickstart
+
+```ts
+// playwright.config.ts
+import { defineConfig } from '@playwright/test';
+import { qualflareReporter } from '@qualflare/playwright';
+
+export default defineConfig({
+  reporter: [['list'], qualflareReporter({ environment: 'staging' })],
+});
+```
+
+`qualflareReporter()` is a typed helper. Playwright types reporter options as `any`, so the
+hand-written tuple form silently accepts typos — but it works too, if you prefer it:
+
+```ts
+reporter: [['list'], ['@qualflare/playwright/reporter', { environment: 'staging' }]],
+```
+
+Then run your tests and upload the results — two steps, and no token needed for the first:
+
+```sh
+# 1. Run. Writes ./qualflare-results (JSON + any videos). Zero network calls.
+npx playwright test
+
+# 2. Upload. `qf login <identifier> <token>` stores the credential once.
+qf <your-project-identifier> collect ./qualflare-results
+```
+
+### Sharded CI
+
+Point every shard at the **same** `outputDir` and collect once at the end. Each process writes its
+own uniquely-named file, so shards never overwrite each other, and `qf collect` merges every file in
+the directory into a single Launch:
+
+```sh
+# in each parallel job — all writing to the same directory
+npx playwright test --shard="$SHARD_INDEX/$SHARD_TOTAL"
+
+# once, after all shards finish (e.g. with the directory restored from CI artifacts)
+qf <your-project-identifier> collect ./qualflare-results
+```
+
+Nothing needs configuring for this: Playwright hands reporters its own `--shard` value, so each
+case is stamped with the shard that ran it automatically. (Playwright's shard index is 1-based and
+Qualflare's is 0-based; the conversion is handled for you.)
+
+## Enriching your tests
+
+```ts
+import { test, expect } from '@playwright/test';
+import { qualflare } from '@qualflare/playwright';
+
+test('a user can check out @smoke', async ({ page }) => {
+  qualflare.label('epic', 'Billing');
+  qualflare.link('https://tracker.example/QF-42', { type: 'issue', name: 'QF-42' });
+  qualflare.priority('high');
+
+  await qualflare.step('add an item to the cart', async () => {
+    qualflare.parameter('sku', 'BOOK-1');
+    await page.getByRole('button', { name: 'Add' }).click();
+  });
+
+  await expect(page.getByTestId('total')).toHaveText('10.00');
+});
+```
+
+`qualflare.step()` delegates to Playwright's own `test.step()`, so your steps appear in the
+Playwright HTML report and trace viewer as well as in Qualflare. Full reference in
+[`docs/METADATA-API.md`](./docs/METADATA-API.md).
+
+## Configuration
+
+Every option has an environment-variable override, and everything has a sensible default — see
+[`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md). There is no `token` option: this reporter makes
+no requests, so it has no credential.
+
+## Known limitations
+
+- **Traces are not uploaded.** Playwright traces are `application/zip`, which Qualflare's attachment
+  upload endpoint rejects. They are deliberately not attached rather than attached as a link to
+  nothing.
+- **`pw:api` and `fixture` steps are filtered out by default** (`includeApiSteps`) — a single
+  browser test emits hundreds, which buries the steps you actually wrote. A *failed* one is always
+  kept.
+- **`outputDir` is merged blindly** — `qf collect` uploads every report file it finds, with no
+  run-identity check, so a directory left over from a previous run is silently merged into the
+  current one. Clear it at the start of each run.
+- **`merge-reports` mode is not supported** in v0.1.0 — use the `outputDir` flow above rather than
+  Playwright's `blob` reporter.
+
+Full details in [`docs/LIMITATIONS.md`](./docs/LIMITATIONS.md).
+
+## Development
+
+```sh
+npm run typecheck        # tsc --noEmit
+npm run lint             # eslint .
+npm run build            # tsup -> dist/ (ESM + CJS + d.ts)
+npm test                 # unit tests
+npm run test:integration # spawns a REAL `playwright test` against test/integration/fixtures/
+```
+
+The integration suite loads the reporter from the built `dist/`, not `src/`, so it exercises the
+real package `exports` map — run `npm run build` first.
+
+## License
+
+Apache-2.0

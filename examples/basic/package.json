@@ -1,0 +1,14 @@
+{
+  "name": "qualflare-playwright-basic-example",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Minimal example of using @qualflare/playwright in a real Playwright project.",
+  "type": "module",
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "@qualflare/playwright": "file:../../qualflare-playwright-0.1.0.tgz"
+  },
+  "scripts": {
+    "test": "playwright test"
+  }
+}

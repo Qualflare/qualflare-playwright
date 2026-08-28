@@ -43,6 +43,7 @@ function mapStatus(status: TestResult['status']): CaseStatus {
 
 // Matches ANSI SGR escapes. Written as a unicode escape rather than a literal
 // control character, so this source stays copy-pasteable and greppable.
+// eslint-disable-next-line no-control-regex -- matching ANSI escapes requires the escape byte itself
 const ANSI_PATTERN = /\u001b\[[0-9;]*m/g;
 
 function stripAnsi(text: string): string {
