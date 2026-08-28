@@ -1,0 +1,81 @@
+{
+  "name": "@qualflare/playwright",
+  "version": "0.1.0",
+  "description": "Native Playwright reporter for the Qualflare test-management platform.",
+  "keywords": [
+    "qualflare",
+    "playwright",
+    "playwright-reporter",
+    "test-reporter",
+    "e2e",
+    "test-results",
+    "flaky-tests",
+    "test-reporting"
+  ],
+  "homepage": "https://qualflare.com",
+  "bugs": {
+    "url": "https://github.com/Qualflare/qualflare-playwright/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Qualflare/qualflare-playwright.git"
+  },
+  "license": "Apache-2.0",
+  "author": "Qualflare",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./reporter": {
+      "types": "./dist/reporter/index.d.ts",
+      "import": "./dist/reporter/index.js",
+      "require": "./dist/reporter/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "peerDependencies": {
+    "@playwright/test": ">=1.40.0"
+  },
+  "dependencies": {
+    "ci-info": "^4.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "@types/node": "^18.19.50",
+    "eslint": "^9.9.1",
+    "execa": "^9.3.1",
+    "prettier": "^3.3.3",
+    "tsup": "^8.2.4",
+    "typescript": "^5.6.2",
+    "typescript-eslint": "^8.5.0",
+    "vitest": "^2.0.5"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run test/unit",
+    "test:integration": "vitest run test/integration --pool=forks --testTimeout=120000",
+    "test:all": "npm run test && npm run test:integration",
+    "prepublishOnly": "npm run build"
+  }
+}

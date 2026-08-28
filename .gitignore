@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+
+# Playwright artifacts (from this repo's own integration-test fixture project)
+test/integration/fixtures/**/test-results/
+test/integration/fixtures/**/playwright-report/
+test/integration/fixtures/**/qualflare-results/
+
+# example project artifacts
+examples/**/node_modules/
+examples/**/test-results/
+examples/**/playwright-report/
+examples/**/qualflare-results/
