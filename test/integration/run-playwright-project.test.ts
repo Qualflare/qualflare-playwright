@@ -6,6 +6,19 @@ import { fileURLToPath } from 'node:url';
 import { execa } from 'execa';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const playwrightVersion: string = JSON.parse(
+  fs.readFileSync(new URL('../../node_modules/@playwright/test/package.json', import.meta.url), 'utf8'),
+).version;
+
+/** `TestCase.tags` — the @tokens Playwright parses out of titles — only exists
+ * from 1.42. Below that the reporter deliberately reports no native tags
+ * rather than refusing to install; see docs/LIMITATIONS.md. */
+const SUPPORTS_NATIVE_TAGS = (() => {
+  const [major, minor] = playwrightVersion.split('.').map(Number);
+  return (major ?? 0) > 1 || ((major ?? 0) === 1 && (minor ?? 0) >= 42);
+})();
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../..');
 const fixtureConfig = path.join(here, 'fixtures/playwright-project/playwright.config.ts');
@@ -158,8 +171,14 @@ describe('qualflare-playwright against a real playwright run', () => {
       ]);
       expect(meta.priority).toBe('high');
       expect(meta.description).toContain('Exercises the qualflare.* metadata API');
-      // Playwright's own @-tag from the title, plus qualflare.tag().
-      expect(meta.tags).toEqual(expect.arrayContaining(['@smoke', 'qualflare-playwright-self-test']));
+      // qualflare.tag() works on every supported Playwright version...
+      expect(meta.tags).toEqual(expect.arrayContaining(['qualflare-playwright-self-test']));
+      // ...while Playwright's own @-tag from the title needs 1.42+.
+      if (SUPPORTS_NATIVE_TAGS) {
+        expect(meta.tags).toEqual(expect.arrayContaining(['@smoke']));
+      } else {
+        expect(meta.tags).not.toContain('@smoke');
+      }
       // parameter() outside any step lands in Case.properties...
       expect(meta.properties['outside-step-param']).toBe('outside-value');
       // ...and inside qualflare.step() lands on that step.
