@@ -197,6 +197,26 @@ describe('qualflare-playwright against a real playwright run', () => {
       const nested = allCases.flatMap((c) => c.steps ?? []).filter((s: { parentIndex?: number }) => s.parentIndex !== undefined);
       expect(nested.length).toBeGreaterThan(0);
 
+      // Every video file on disk must be referenced by the report. A retried
+      // test reaches onTestEnd once per attempt, and only the final attempt's
+      // attachments are reported — so without discarding superseded attempts,
+      // the earlier one's video is copied and orphaned here forever.
+      const videosOnDisk = fs.readdirSync(outputDir).filter((f) => f.endsWith('.webm'));
+      const videosReferenced = new Set(
+        allCases.flatMap((c) => (c.attachments ?? []).map((a: { localVideoPath?: string }) => a.localVideoPath)).filter(Boolean),
+      );
+      expect(videosOnDisk.length).toBe(videosReferenced.size);
+      expect(new Set(videosOnDisk)).toEqual(videosReferenced);
+
+      // An oversized attachment must be SKIPPED, never fatal: inlining it
+      // would push the body past /collect's 10MB limit and lose the launch.
+      const oversized = allCases.find((c) => c.name === 'an oversized attachment is skipped, not fatal');
+      expect(oversized).toBeDefined();
+      expect(oversized.status).toBe('passed');
+      const oversizedNames = (oversized.attachments ?? []).map((a: { name: string }) => a.name);
+      expect(oversizedNames).not.toContain('too-big');
+      expect(oversizedNames).toContain('small-enough');
+
       // pw:api steps are filtered out by default — one browser test emits
       // hundreds and they would bury everything legible.
       const apiSteps = allCases.flatMap((c) => c.steps ?? []).filter((s: { keyword?: string }) => s.keyword === 'pw:api');

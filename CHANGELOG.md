@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial public release.
 
+### Behavior worth knowing
+
+- `qualflare.attachment()` and `qualflare.attachmentFromFile()` are subject to `maxAttachmentBytes`
+  and the run-wide `maxTotalAttachmentBytes` budget, exactly like Playwright's own attachments. An
+  attachment over either limit is skipped with a warning rather than inlined. This matters because
+  `/collect` rejects a request body over 10MB outright, and a rejected request loses the **entire**
+  launch — not just the oversized attachment.
+
 ### Added
 
 - Native Playwright reporter: suite/case results, real retry counts and flakiness, nested

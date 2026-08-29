@@ -39,7 +39,7 @@ Beyond the steps above, before the first `1.0.0`:
       (not the other way around — code is the source of truth, regenerate docs from it if they've
       drifted).
 - [ ] README quickstart tested by someone who hasn't worked on this package, following it verbatim
-      in a fresh CucumberJS project.
+      in a fresh Playwright project.
 - [ ] Decide deliberately whether `BeforeAll`/`AfterAll` attachment capture and per-attempt retry
       detail (both documented v1 gaps in `docs/LIMITATIONS.md`) are worth a backend extension before
       1.0, or stay out of scope.

@@ -14,7 +14,7 @@ import { msToNs } from '../shared/duration.js';
 import { logger } from '../shared/logger.js';
 import type { Attachment, Case, CaseStatus, Label, Link, Parameter, Step } from '../shared/types.js';
 import type { RuntimeMessage } from '../runtime/message-types.js';
-import type { Attachment as WireAttachment } from '../shared/types.js';
+import { AttachmentBudget, inlineFromBuffer, inlineFromFile } from './attachment-reader.js';
 import { mapSteps } from './step-mapper.js';
 
 /**
@@ -95,7 +95,11 @@ interface ReplayedMetadata {
  * because `qualflare.step()` delegates to `test.step()`, so synthesizing a
  * second step from these messages would double-report every manual step.
  */
-function replayMetadata(result: TestResult): ReplayedMetadata {
+function replayMetadata(
+  result: TestResult,
+  config: ResolvedReporterConfig,
+  budget: AttachmentBudget,
+): ReplayedMetadata {
   const meta: ReplayedMetadata = {
     labels: [],
     links: [],
@@ -154,16 +158,28 @@ function replayMetadata(result: TestResult): ReplayedMetadata {
         }
         break;
       }
-      case 'attachment':
-        meta.attachments.push({
-          name: message.name,
-          ...(message.mimeType ? { mimeType: message.mimeType } : {}),
-          content: message.contentBase64,
-        });
+      case 'attachment': {
+        // Decoded back to bytes rather than trusting the base64 length, so the
+        // cap is applied to the real payload size the server will receive.
+        const inlined = inlineFromBuffer(
+          message.name,
+          Buffer.from(message.contentBase64, 'base64'),
+          message.mimeType,
+          config,
+          budget,
+        );
+        if (inlined) {
+          meta.attachments.push(inlined);
+        }
         break;
-      case 'attachment_from_file':
-        meta.attachments.push(...readFileAttachment(message.name, message.path, message.mimeType));
+      }
+      case 'attachment_from_file': {
+        const fromFile = inlineFromFile(message.name, message.path, message.mimeType, config, budget);
+        if (fromFile) {
+          meta.attachments.push(fromFile);
+        }
         break;
+      }
       case 'step_start':
         openSteps.push(message.name);
         break;
@@ -176,22 +192,6 @@ function replayMetadata(result: TestResult): ReplayedMetadata {
   return meta;
 }
 
-function readFileAttachment(name: string, path: string, mimeType?: string): Attachment[] {
-  try {
-    const bytes = fs.readFileSync(path);
-    return [
-      {
-        name,
-        ...(mimeType ? { mimeType } : {}),
-        content: bytes.toString('base64'),
-        fileSize: bytes.byteLength,
-      },
-    ];
-  } catch (err) {
-    logger.warn(`skipping attachment "${name}": could not read ${path}: ${(err as Error).message}`);
-    return [];
-  }
-}
 
 /** Truncates and caps tags to the server's limits, so a runaway loop in a
  * test can't get a whole launch rejected at validation. */
@@ -214,7 +214,13 @@ export function buildCase(
    * Resolution cannot be deferred to onEnd: `use.preserveOutput` and a
    * passing retry both delete a previous attempt's output directory, so by
    * onEnd the screenshot/video files may no longer exist. */
-  attachmentsByResult: ReadonlyMap<string, WireAttachment[]>,
+  attachmentsByResult: ReadonlyMap<string, Attachment[]>,
+  /** The run-wide inline budget. Needed here because the metadata API's own
+   * attachments (`qualflare.attachment()` / `attachmentFromFile()`) are
+   * resolved at case-build time, and they must draw on the SAME budget as
+   * Playwright's attachments — an uncapped path can push the request past
+   * `/collect`'s 10MB body limit and lose the entire launch. */
+  budget: AttachmentBudget,
 ): Case | undefined {
   // workerIndex === -1 means the test never actually ran (the run was
   // interrupted before it started); there is no result worth reporting.
@@ -232,7 +238,7 @@ export function buildCase(
   const expectedFailure = outcome === 'expected' && final.status === 'failed';
   const status: CaseStatus = expectedFailure ? 'passed' : mapStatus(final.status);
 
-  const meta = replayMetadata(final);
+  const meta = replayMetadata(final, config, budget);
   const steps: Step[] = mapSteps(final.steps, config.includeApiSteps);
 
   // Attach parameters recorded between a step_start/step_stop bracket to the

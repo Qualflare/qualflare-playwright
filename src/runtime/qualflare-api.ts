@@ -22,10 +22,20 @@ import type { RuntimeMessage } from './message-types.js';
  */
 function send(message: RuntimeMessage): void {
   try {
-    void test.info().attach(`qualflare:${message.type}`, {
-      body: Buffer.from(JSON.stringify(message), 'utf8'),
-      contentType: RESERVED_MESSAGE_MEDIA_TYPE,
-    });
+    // The .catch() is not optional. `attach()` returns a promise, and an
+    // unhandled rejection TERMINATES the process by default on Node >= 15 —
+    // a metadata call would take the user's entire test run down with it.
+    // The surrounding try/catch only covers a synchronous throw from
+    // `test.info()` (called outside a running test), not this.
+    void test
+      .info()
+      .attach(`qualflare:${message.type}`, {
+        body: Buffer.from(JSON.stringify(message), 'utf8'),
+        contentType: RESERVED_MESSAGE_MEDIA_TYPE,
+      })
+      .catch((err: unknown) => {
+        logger.warn(`qualflare.${message.type}() could not be recorded: ${(err as Error).message}`);
+      });
   } catch {
     logger.warn(`qualflare.${message.type}() was called outside a running test; the call was ignored.`);
   }

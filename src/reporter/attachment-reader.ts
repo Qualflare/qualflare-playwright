@@ -24,6 +24,14 @@ export class AttachmentBudget {
     return true;
   }
 
+  /** Returns bytes to the budget when the attachment they were reserved for
+   * turns out to be discarded — a retried test's superseded attempt. Without
+   * this, a flaky test consumes budget twice and a LATER test silently loses
+   * its screenshot to an attachment nobody will ever see. */
+  release(bytes: number): void {
+    this.used = Math.max(0, this.used - bytes);
+  }
+
   get usedBytes(): number {
     return this.used;
   }
@@ -117,58 +125,92 @@ export function resolveAttachments(
   return out;
 }
 
-function inlineAttachment(
-  a: TestResult['attachments'][number],
+/**
+ * Turns raw bytes into a wire `Attachment`, enforcing BOTH caps.
+ *
+ * Every path that inlines content must go through here. `/collect` rejects a
+ * body over 10MB outright (api-service `launch_controller.go`'s
+ * `BodyLimit(10<<20)`), and a rejected request loses the ENTIRE launch — not
+ * just the oversized attachment. `maxTotalAttachmentBytes` defaults to 750KB
+ * precisely to stay clear of that, so any path that skips the budget can
+ * silently destroy a whole run's results.
+ */
+export function inlineFromBuffer(
+  name: string,
+  bytes: Buffer,
+  mimeType: string | undefined,
   config: ResolvedReporterConfig,
   budget: AttachmentBudget,
 ): Attachment | undefined {
-  let bytes: Buffer;
-
-  if (a.body) {
-    bytes = a.body;
-  } else if (a.path) {
-    // stat before read: an oversized file must be rejected without pulling it
-    // into memory first.
-    let size: number;
-    try {
-      size = fs.statSync(a.path).size;
-    } catch (err) {
-      logger.warn(`skipping attachment "${a.name}": could not stat ${a.path}: ${(err as Error).message}`);
-      return undefined;
-    }
-    if (size > config.maxAttachmentBytes) {
-      logger.warn(
-        `skipping attachment "${a.name}": ${size} bytes exceeds the configured maxAttachmentBytes cap of ${config.maxAttachmentBytes} bytes.`,
-      );
-      return undefined;
-    }
-    try {
-      bytes = fs.readFileSync(a.path);
-    } catch (err) {
-      logger.warn(`skipping attachment "${a.name}": could not read ${a.path}: ${(err as Error).message}`);
-      return undefined;
-    }
-  } else {
-    return undefined;
-  }
-
   if (bytes.byteLength > config.maxAttachmentBytes) {
     logger.warn(
-      `skipping attachment "${a.name}": ${bytes.byteLength} bytes exceeds the configured maxAttachmentBytes cap of ${config.maxAttachmentBytes} bytes.`,
+      `skipping attachment "${name}": ${bytes.byteLength} bytes exceeds the configured maxAttachmentBytes cap of ${config.maxAttachmentBytes} bytes.`,
     );
     return undefined;
   }
   if (!budget.tryReserve(bytes.byteLength)) {
     logger.warn(
-      `skipping attachment "${a.name}": this run's total inline-attachment budget of ${config.maxTotalAttachmentBytes} bytes is exhausted.`,
+      `skipping attachment "${name}": this run's total inline-attachment budget of ${config.maxTotalAttachmentBytes} bytes is exhausted.`,
     );
     return undefined;
   }
 
   return {
-    name: a.name,
-    ...(a.contentType ? { mimeType: a.contentType } : {}),
+    name,
+    ...(mimeType ? { mimeType } : {}),
     content: bytes.toString('base64'),
     fileSize: bytes.byteLength,
   };
+}
+
+/**
+ * Reads a file from disk and inlines it, subject to the same caps.
+ *
+ * `stat`s before reading so an oversized file is rejected without ever being
+ * pulled into memory. Every failure warns and returns `undefined`; an
+ * attachment must never fail a run.
+ */
+export function inlineFromFile(
+  name: string,
+  filePath: string,
+  mimeType: string | undefined,
+  config: ResolvedReporterConfig,
+  budget: AttachmentBudget,
+): Attachment | undefined {
+  let size: number;
+  try {
+    size = fs.statSync(filePath).size;
+  } catch (err) {
+    logger.warn(`skipping attachment "${name}": could not stat ${filePath}: ${(err as Error).message}`);
+    return undefined;
+  }
+  if (size > config.maxAttachmentBytes) {
+    logger.warn(
+      `skipping attachment "${name}": ${size} bytes exceeds the configured maxAttachmentBytes cap of ${config.maxAttachmentBytes} bytes.`,
+    );
+    return undefined;
+  }
+
+  let bytes: Buffer;
+  try {
+    bytes = fs.readFileSync(filePath);
+  } catch (err) {
+    logger.warn(`skipping attachment "${name}": could not read ${filePath}: ${(err as Error).message}`);
+    return undefined;
+  }
+  return inlineFromBuffer(name, bytes, mimeType, config, budget);
+}
+
+function inlineAttachment(
+  a: TestResult['attachments'][number],
+  config: ResolvedReporterConfig,
+  budget: AttachmentBudget,
+): Attachment | undefined {
+  if (a.body) {
+    return inlineFromBuffer(a.name, a.body, a.contentType, config, budget);
+  }
+  if (a.path) {
+    return inlineFromFile(a.name, a.path, a.contentType, config, budget);
+  }
+  return undefined;
 }
