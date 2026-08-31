@@ -1,14 +1,14 @@
 /**
- * Shared constants used across the formatter and the author-facing runtime
+ * Shared constants used across the reporter and the author-facing runtime
  * API.
  */
 
-/** Reserved `World.attach()` media type used to smuggle structured
- * `qualflare.*()` calls (label/tag/step/etc.) from step-definition and hook
- * code back to the formatter process — the only data channel CucumberJS
- * gives user code back to a running formatter. The formatter's attachment
- * handler recognizes this exact media type and replays the message as a
- * model mutation instead of rendering it as a literal attachment. */
+/** Reserved `testInfo.attach()` content type used to smuggle structured
+ * `qualflare.*()` calls (label/tag/step/etc.) from test and hook code back to
+ * the reporter — the only channel Playwright gives user code back to a
+ * running reporter. The reporter recognizes this exact content type and
+ * replays the message as a model mutation instead of reporting it as a
+ * literal attachment. */
 export const RESERVED_MESSAGE_MEDIA_TYPE = 'application/vnd.qualflare.message+json';
 
 /** Server-side caps this client should respect defensively (see

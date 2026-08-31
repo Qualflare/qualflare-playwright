@@ -165,7 +165,7 @@ export interface Case {
 }
 
 export interface Suite {
-  /** Required, 1-255 chars. One Suite per `.feature` file. */
+  /** Required, 1-255 chars. One Suite per Playwright spec file. */
   name: string;
   category?: FrameworkCategory;
   assertions?: number;

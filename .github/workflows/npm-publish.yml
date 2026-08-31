@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   npm-publish:
-    name: Publish @qualflare/cucumberjs
+    name: Publish @qualflare/playwright
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -27,9 +27,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          # Matches ci.yml's unit job — the @cucumber/cucumber devDependency
-          # requires Node 22+.
-          node-version: '22'
+          # Matches ci.yml's unit job, so the tarball is built on the same
+          # Node the test suite ran against. `engines` allows >=18.
+          node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
       - run: npm ci

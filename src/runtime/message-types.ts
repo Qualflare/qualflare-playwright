@@ -2,14 +2,14 @@ import type { CasePriority, LinkType, Parameter } from '../shared/types.js';
 
 /**
  * `qualflare.*()` calls (see `qualflare-api.ts`) are fire-and-forget: each
- * one is serialized into one of these and shipped to the formatter process
- * via `world.attach(JSON.stringify(message), RESERVED_MESSAGE_MEDIA_TYPE)` —
- * the only data channel CucumberJS gives step-definition/hook code back to a
- * running formatter (see `shared/constants.ts`'s `RESERVED_MESSAGE_MEDIA_TYPE`
- * doc comment). There is no client-side accumulator/buffer the way
- * `@qualflare/cypress` has (`TestMetadataBuffer`) — all accumulation happens
- * formatter-side, in `formatter/attempt-tracker.ts`, keyed by the attachment
- * envelope's `testCaseStartedId`.
+ * one is serialized into one of these and shipped to the reporter process
+ * via `test.info().attach(JSON.stringify(message), { contentType:
+ * RESERVED_MESSAGE_MEDIA_TYPE })` — the only channel Playwright gives test
+ * code back to a running reporter (see `shared/constants.ts`'s
+ * `RESERVED_MESSAGE_MEDIA_TYPE` doc comment). There is no client-side
+ * accumulator/buffer the way `@qualflare/cypress` has (`TestMetadataBuffer`)
+ * — all accumulation happens reporter-side, in `reporter/case-builder.ts`'s
+ * `replayMetadata`, which reads them off the attempt's own attachment list.
  */
 export type RuntimeMessage =
   | { type: 'label'; name: string; value: string }
