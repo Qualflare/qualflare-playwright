@@ -24,6 +24,7 @@ There is **no `token` option**. This reporter makes no network calls, so it has 
 |---|---|---|---|
 | `outputDir` | `QUALFLARE_OUTPUT_DIR` | `./qualflare-results` | Directory this process writes its report file (and any videos) into. Relative paths resolve against your Playwright config's directory, not the shell's cwd. Every file is uniquely named, so parallel shards can share one directory safely. |
 | `shardIndex` | `QUALFLARE_SHARD_INDEX` | auto | 0-based shard position, stamped on every case. Auto-detected from Playwright's own `--shard i/N` (whose index is 1-based, and is converted). An attribution label only — `qualflare-cli` merges by directory contents, never by this. |
+| `runId` | `QUALFLARE_RUN_ID` | CI run id, else a per-process UUID | Identifies the run a report belongs to. Every shard of one CI run resolves the same value (`GITHUB_RUN_ID`, `CI_PIPELINE_ID`, …), so `qf collect` can tell shards of this run apart from a file left over by an earlier one and refuse to merge them. Needs `@qualflare/cli` v0.1.19+. Only set it yourself if your CI is not auto-detected and you shard. |
 | `enabled` | `QUALFLARE_ENABLED` | `true` | `false` makes the reporter a complete no-op rather than throwing. |
 | `environment` | `QUALFLARE_ENVIRONMENT` → `QF_ENVIRONMENT` | `development` | **The environment's uid (slug), not its display name** — see below. Must be non-empty; an explicit `''` falls back to the default rather than failing the launch later at `collect`. |
 | `language` | `QUALFLARE_LANGUAGE` → `QF_LANGUAGE` | `en-US` | Same non-empty treatment. |

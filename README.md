@@ -119,9 +119,9 @@ wrong value cannot fail at test time — the reporter makes no requests — so t
 - **`pw:api` and `fixture` steps are filtered out by default** (`includeApiSteps`) — a single
   browser test emits hundreds, which buries the steps you actually wrote. A *failed* one is always
   kept.
-- **`outputDir` is merged blindly** — `qf collect` uploads every report file it finds, with no
-  run-identity check, so a directory left over from a previous run is silently merged into the
-  current one. Clear it at the start of each run.
+- **A stale `outputDir` is refused, not merged** — each report carries a `runId`, and `qf collect`
+  errors rather than merging files from two different runs. Needs `@qualflare/cli` v0.1.19+; older
+  CLIs merge as before.
 - **`merge-reports` mode is not supported** in v0.1.0 — use the `outputDir` flow above rather than
   Playwright's `blob` reporter.
 
