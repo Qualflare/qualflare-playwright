@@ -5,6 +5,25 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.2.0
+
+### Added
+
+- `metadata.runId` on every report, plus a `runId` option (`QUALFLARE_RUN_ID`) to set it
+  explicitly. Every shard of one CI run resolves the same value (`GITHUB_RUN_ID`,
+  `CI_PIPELINE_ID`, and so on); outside CI it is a per-process UUID.
+
+  This is what lets `qf collect` tell the shards of the current run apart from a file left behind
+  by an earlier one. Until now a stale report sitting in `outputDir` was merged into the launch
+  silently — the launch looked entirely plausible and contained results nobody ran, which corrupts
+  the history flaky-detection is built on. Requires `@qualflare/cli` v0.1.19 or newer, which
+  refuses the merge and names the offending files; older CLIs ignore `runId` and merge as before.
+
+### Changed
+
+- The stale-file caveat in `README.md` and `docs/LIMITATIONS.md` documents what now actually
+  happens, instead of asking you to remember to clear the directory.
+
 ## 0.1.0
 
 Initial public release.
