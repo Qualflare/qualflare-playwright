@@ -105,6 +105,12 @@ Every option has an environment-variable override, and everything has a sensible
 [`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md). There is no `token` option: this reporter makes
 no requests, so it has no credential.
 
+One option is worth calling out because it fails late: `environment` is matched against the
+environment's **uid (slug)**, not its display name, so **Staging** in the UI is `staging` here. A
+wrong value cannot fail at test time — the reporter makes no requests — so the run succeeds and
+`collect` 404s afterwards. See
+[the note in the configuration docs](./docs/CONFIGURATION.md#environment-is-matched-by-uid-not-display-name).
+
 ## Known limitations
 
 - **Traces are not uploaded.** Playwright traces are `application/zip`, which Qualflare's attachment
@@ -113,9 +119,9 @@ no requests, so it has no credential.
 - **`pw:api` and `fixture` steps are filtered out by default** (`includeApiSteps`) — a single
   browser test emits hundreds, which buries the steps you actually wrote. A *failed* one is always
   kept.
-- **`outputDir` is merged blindly** — `qf collect` uploads every report file it finds, with no
-  run-identity check, so a directory left over from a previous run is silently merged into the
-  current one. Clear it at the start of each run.
+- **A stale `outputDir` is refused, not merged** — each report carries a `runId`, and `qf collect`
+  errors rather than merging files from two different runs. Needs `@qualflare/cli` v0.1.19+; older
+  CLIs merge as before.
 - **`merge-reports` mode is not supported** in v0.1.0 — use the `outputDir` flow above rather than
   Playwright's `blob` reporter.
 

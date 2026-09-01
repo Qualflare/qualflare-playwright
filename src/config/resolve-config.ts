@@ -1,12 +1,15 @@
+import { randomUUID } from 'node:crypto';
+
 import { MAX_VIDEO_UPLOAD_BYTES } from '../shared/constants.js';
 import type { Platform } from '../shared/types.js';
 import { detectCi, type CiMetadata } from './ci-detect.js';
 import { detectGit, type GitInfo } from './git-detect.js';
 
-/** Options passed via the `--format-options`/`formatOptions` value the user
- * passes to `@qualflare/playwright/reporter` in `playwright.config.ts`'s
- * `reporter` array. Every field here also has an environment-variable
- * override — see the precedence table in the README / plan. */
+/** Options for the reporter, passed as the second element of its entry in
+ * `playwright.config.ts`'s `reporter` array:
+ * `['@qualflare/playwright/reporter', { ... }]`. Every field here also has an
+ * environment-variable override — see the precedence table in
+ * `docs/CONFIGURATION.md`. */
 export interface QualflarePlaywrightOptions {
   environment?: string;
   language?: string;
@@ -24,12 +27,15 @@ export interface QualflarePlaywrightOptions {
   ciBuildNumber?: string;
   ciRunUrl?: string;
   ciPrNumber?: number;
+  /** Identifier shared by every shard of one run, written into the report as
+   * `metadata.runId`. `qualflare-cli collect` groups files by it and refuses
+   * to merge a stale report from an earlier run into this launch.
+   *
+   * Auto-detected from CI. Outside CI it falls back to a per-process UUID,
+   * which is correct there: every local run is a distinct run, so a leftover
+   * file is still caught. */
+  runId?: string;
   attachScreenshots?: boolean;
-  /** Include `BeforeStep`/`AfterStep` hook executions as synthetic steps.
-   * Off by default — these run once per Gherkin step and can multiply the
-   * step count several-fold for suites with global per-step instrumentation
-   * hooks (e.g. a screenshot-after-every-step hook), which is noisy as a
-   * default but valuable as an explicit opt-in. */
   /** Include Playwright's runner-internal steps — `pw:api` (every
    * `page.click()`, `locator.fill()`, ...) and `fixture` (the implicit
    * `browser`/`context`/`page` setup every browser test opens with) — as
@@ -49,11 +55,11 @@ export interface QualflarePlaywrightOptions {
   maxVideoBytes?: number;
   debug?: boolean;
   /** `false` fully disables accumulation/upload (a complete no-op) but the
-   * formatter still no-ops cleanly rather than throwing. */
+   * reporter still no-ops cleanly rather than throwing. */
   enabled?: boolean;
-  /** Directory `finished()` writes this process's report file (and any
+  /** Directory `onEnd()` writes this process's report file (and any
    * video attachments) into. Default `./qualflare-results`. Always active —
-   * this formatter never uploads anything itself; `qualflare-cli` reads
+   * this reporter never uploads anything itself; `qualflare-cli` reads
    * whatever ends up in this directory. Every JSON file this process writes
    * is uniquely named, so multiple shards can safely share one `outputDir`
    * without colliding — see docs/LIMITATIONS.md. */
@@ -90,6 +96,7 @@ export interface ResolvedReporterConfig {
   ciBuildNumber?: string;
   ciRunUrl?: string;
   ciPrNumber?: number;
+  runId: string;
   attachScreenshots: boolean;
   includeApiSteps: boolean;
   maxAttachmentBytes: number;
@@ -129,8 +136,9 @@ function envInt(...names: string[]): number | undefined {
 }
 
 
-/** Resolves the full formatter configuration from, in order: the explicit
- * `options` (the formatter's own `formatOptions`), then `QUALFLARE_*`
+/** Resolves the full reporter configuration from, in order: the explicit
+ * `options` (the second element of the `playwright.config.ts` reporter
+ * tuple, `['@qualflare/playwright', { ... }]`), then `QUALFLARE_*`
  * environment variables, then `QF_*` (compat alias with the existing Go
  * CLI, where an equivalent exists), then a hardcoded default.
  *
@@ -151,7 +159,7 @@ function envInt(...names: string[]): number | undefined {
  * `deps` lets tests inject fake `detectGit`/`detectCi` implementations
  * instead of the real ones (which shell out to `git` and read the real
  * `process.env`/`ci-info` module state) — defaults to the real detectors,
- * so every production call site (the formatter's constructor calls
+ * so every production call site (the reporter's constructor calls
  * `resolveConfig(options)` with no second argument) is unaffected.
  */
 export function resolveConfig(
@@ -189,6 +197,11 @@ export function resolveConfig(
   const ciRunUrl = options.ciRunUrl ?? detectedCi.ciRunUrl;
   const ciPrNumber = options.ciPrNumber ?? detectedCi.ciPrNumber;
 
+  // Never empty on purpose: `qf collect` treats a report with no runId as
+  // "unknown run" and never lets it block a merge, so defaulting to '' would
+  // quietly opt local runs out of the very check this exists for.
+  const runId = options.runId ?? firstEnv('QUALFLARE_RUN_ID') ?? detectedCi.ciRunId ?? randomUUID();
+
   return {
     // `||` (truthy check), not `??`, for these three REQUIRED-non-empty wire
     // fields — an explicit `''` option must not silently win over the
@@ -208,6 +221,7 @@ export function resolveConfig(
     ciBuildNumber,
     ciRunUrl,
     ciPrNumber,
+    runId,
     attachScreenshots: options.attachScreenshots ?? envBool('QUALFLARE_ATTACH_SCREENSHOTS') ?? true,
     includeApiSteps: options.includeApiSteps ?? envBool('QUALFLARE_INCLUDE_API_STEPS') ?? false,
     maxAttachmentBytes: options.maxAttachmentBytes ?? envInt('QUALFLARE_MAX_ATTACHMENT_BYTES') ?? 1_500_000,

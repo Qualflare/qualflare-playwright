@@ -59,12 +59,25 @@ sharing a directory never overwrite each other.
 Requires [`@qualflare/cli`](https://github.com/Qualflare/qualflare-cli) **v0.1.17 or newer** — the
 first release that preserves `labels`/`links` and step nesting through `collect`.
 
-### Stale-file caveat
+### Stale files are refused, not merged
 
-Merging is based purely on which files are in `outputDir` when `qf collect` runs. There is **no
-run-identity check**, so a directory left over from a previous run is silently merged into the
-current one, producing a Launch containing results from both. Clear or freshly create `outputDir` at
-the start of each run — the same convention Allure uses for `allure-results`.
+Each report carries `metadata.runId` — the identifier every shard of one run shares and different
+runs do not (`GITHUB_RUN_ID`, `CI_PIPELINE_ID`, and so on; a per-process UUID outside CI). If
+`collect` finds files from more than one run it refuses to upload and names them:
+
+```
+Error: 2 different runs found in the report files:
+    run 17244102887: 1 file(s)  (stale.json)
+    run 17244981923: 2 file(s)  (shard-0.json, shard-1.json)
+  A stale file from an earlier run would be merged into this launch.
+  Clear the output directory before each run, or pass --allow-mixed-runs to upload anyway
+```
+
+Clearing `outputDir` at the start of each run is still the tidier habit — in CI it is usually free,
+since the workspace is fresh — but forgetting now costs a failed upload rather than a launch
+quietly containing results nobody ran.
+
+Needs `@qualflare/cli` v0.1.19 or newer. An older CLI ignores `runId` and merges as before.
 
 ### `merge-reports` mode is not supported
 

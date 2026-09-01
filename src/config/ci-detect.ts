@@ -7,6 +7,13 @@ export interface CiMetadata {
   ciBuildNumber?: string;
   ciRunUrl?: string;
   ciPrNumber?: number;
+  /** Identifier every shard of ONE CI run shares, and which differs between
+   * runs. Distinct from `ciBuildNumber`: a build number is the human-facing
+   * counter (GitHub's run NUMBER repeats across re-runs of a workflow),
+   * whereas this is the unique run id. `qualflare-cli collect` groups report
+   * files by it to refuse merging a stale file from an earlier run into the
+   * current launch. */
+  ciRunId?: string;
 }
 
 interface ProviderExtractor {
@@ -14,6 +21,7 @@ interface ProviderExtractor {
   providerName: string;
   buildNumber?: (env: NodeJS.ProcessEnv) => string | undefined;
   runUrl?: (env: NodeJS.ProcessEnv) => string | undefined;
+  runId?: (env: NodeJS.ProcessEnv) => string | undefined;
   prNumber?: (env: NodeJS.ProcessEnv) => number | undefined;
 }
 
@@ -41,6 +49,7 @@ const PROVIDERS: ProviderExtractor[] = [
     detect: (env) => env.GITHUB_ACTIONS === 'true',
     providerName: 'GitHub Actions',
     buildNumber: (env) => nonEmpty(env.GITHUB_RUN_NUMBER),
+    runId: (env) => nonEmpty(env.GITHUB_RUN_ID),
     runUrl: (env) =>
       env.GITHUB_SERVER_URL && env.GITHUB_REPOSITORY && env.GITHUB_RUN_ID
         ? `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}`
@@ -54,6 +63,7 @@ const PROVIDERS: ProviderExtractor[] = [
     detect: (env) => env.GITLAB_CI === 'true',
     providerName: 'GitLab CI',
     buildNumber: (env) => nonEmpty(env.CI_PIPELINE_IID),
+    runId: (env) => nonEmpty(env.CI_PIPELINE_ID),
     runUrl: (env) => nonEmpty(env.CI_PIPELINE_URL),
     prNumber: (env) => parsePositiveInt(env.CI_MERGE_REQUEST_IID),
   },
@@ -61,6 +71,7 @@ const PROVIDERS: ProviderExtractor[] = [
     detect: (env) => env.CIRCLECI === 'true',
     providerName: 'CircleCI',
     buildNumber: (env) => nonEmpty(env.CIRCLE_BUILD_NUM),
+    runId: (env) => nonEmpty(env.CIRCLE_WORKFLOW_ID ?? env.CIRCLE_BUILD_NUM),
     runUrl: (env) => nonEmpty(env.CIRCLE_BUILD_URL),
     prNumber: (env) => parsePositiveInt(env.CIRCLE_PR_NUMBER),
   },
@@ -68,6 +79,7 @@ const PROVIDERS: ProviderExtractor[] = [
     detect: (env) => env.BUILDKITE === 'true',
     providerName: 'Buildkite',
     buildNumber: (env) => nonEmpty(env.BUILDKITE_BUILD_NUMBER),
+    runId: (env) => nonEmpty(env.BUILDKITE_BUILD_ID),
     runUrl: (env) => nonEmpty(env.BUILDKITE_BUILD_URL),
     prNumber: (env) => {
       const raw = env.BUILDKITE_PULL_REQUEST;
@@ -83,6 +95,7 @@ const PROVIDERS: ProviderExtractor[] = [
     detect: (env) => Boolean(env.JENKINS_URL),
     providerName: 'Jenkins',
     buildNumber: (env) => nonEmpty(env.BUILD_NUMBER),
+    runId: (env) => nonEmpty(env.BUILD_TAG ?? env.BUILD_NUMBER),
     runUrl: (env) => nonEmpty(env.BUILD_URL),
     // Jenkins has no standardized PR-number env var across its many PR
     // plugins (Multibranch, GitHub Branch Source, etc.) — deliberately
@@ -92,6 +105,7 @@ const PROVIDERS: ProviderExtractor[] = [
     detect: (env) => env.TF_BUILD === 'True' || env.TF_BUILD === 'true',
     providerName: 'Azure Pipelines',
     buildNumber: (env) => nonEmpty(env.BUILD_BUILDID),
+    runId: (env) => nonEmpty(env.BUILD_BUILDID),
     runUrl: (env) => {
       const collectionUri = env.SYSTEM_TEAMFOUNDATIONCOLLECTIONURI;
       const project = env.SYSTEM_TEAMPROJECT;
@@ -107,6 +121,7 @@ const PROVIDERS: ProviderExtractor[] = [
     detect: (env) => Boolean(env.BITBUCKET_BUILD_NUMBER),
     providerName: 'Bitbucket Pipelines',
     buildNumber: (env) => nonEmpty(env.BITBUCKET_BUILD_NUMBER),
+    runId: (env) => nonEmpty(env.BITBUCKET_BUILD_NUMBER),
     runUrl: (env) => {
       const origin = env.BITBUCKET_GIT_HTTP_ORIGIN;
       if (!origin) {
@@ -144,6 +159,8 @@ export function detectCi(env: NodeJS.ProcessEnv = process.env): CiMetadata {
     if (runUrl !== undefined) result.ciRunUrl = runUrl;
     const prNumber = provider.prNumber?.(env);
     if (prNumber !== undefined) result.ciPrNumber = prNumber;
+    const runId = provider.runId?.(env);
+    if (runId !== undefined) result.ciRunId = runId;
     return result;
   }
 

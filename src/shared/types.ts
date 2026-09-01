@@ -48,6 +48,14 @@ export interface Metadata {
   version: string;
   timestamp: string;
   cliName: string;
+  /** Identifier every shard of ONE run shares. `qualflare-cli collect` groups
+   * the report files in a directory by this and refuses to upload when more
+   * than one distinct run is present, so a file left over from an earlier run
+   * cannot be merged silently into this launch.
+   *
+   * Optional because reports written by earlier releases have none; the CLI
+   * treats those as "unknown run" and never blocks on them. */
+  runId?: string;
 }
 
 export interface Label {
@@ -165,7 +173,7 @@ export interface Case {
 }
 
 export interface Suite {
-  /** Required, 1-255 chars. One Suite per `.feature` file. */
+  /** Required, 1-255 chars. One Suite per Playwright spec file. */
   name: string;
   category?: FrameworkCategory;
   assertions?: number;
