@@ -25,7 +25,7 @@ There is **no `token` option**. This reporter makes no network calls, so it has 
 | `outputDir` | `QUALFLARE_OUTPUT_DIR` | `./qualflare-results` | Directory this process writes its report file (and any videos) into. Relative paths resolve against your Playwright config's directory, not the shell's cwd. Every file is uniquely named, so parallel shards can share one directory safely. |
 | `shardIndex` | `QUALFLARE_SHARD_INDEX` | auto | 0-based shard position, stamped on every case. Auto-detected from Playwright's own `--shard i/N` (whose index is 1-based, and is converted). An attribution label only — `qualflare-cli` merges by directory contents, never by this. |
 | `enabled` | `QUALFLARE_ENABLED` | `true` | `false` makes the reporter a complete no-op rather than throwing. |
-| `environment` | `QUALFLARE_ENVIRONMENT` → `QF_ENVIRONMENT` | `development` | Must be non-empty; an explicit `''` falls back to the default rather than failing the launch later at `collect`. |
+| `environment` | `QUALFLARE_ENVIRONMENT` → `QF_ENVIRONMENT` | `development` | **The environment's uid (slug), not its display name** — see below. Must be non-empty; an explicit `''` falls back to the default rather than failing the launch later at `collect`. |
 | `language` | `QUALFLARE_LANGUAGE` → `QF_LANGUAGE` | `en-US` | Same non-empty treatment. |
 | `framework` | — | `playwright` | Same non-empty treatment. Drives the suite category server-side. |
 | `platform` | — | `web` | One of `android`, `ios`, `desktop`, `web`, `api`. |
@@ -55,6 +55,27 @@ There is **no `token` option**. This reporter makes no network calls, so it has 
 
 The subprocess is skipped entirely when both values are already resolved by an earlier tier, so a
 CI run that sets them never forks `git`.
+
+## `environment` is matched by uid, not display name
+
+The server resolves this value against the environment's **uid** (its slug), not the name shown in
+the UI:
+
+```sql
+SELECT * FROM environments WHERE project_id = $1 AND uid = $2;
+```
+
+So an environment displayed as **Staging** is almost certainly `staging` here. Passing the display
+name verbatim is the common mistake, and it does not fail at test time — the reporter has no
+network access and cannot know the value is wrong, so the run completes and writes a perfectly
+valid report. It fails later, when `qualflare-cli collect` uploads it and the lookup misses:
+
+```
+environment 'Staging' not found   (404)
+```
+
+If `collect` 404s on an environment you can plainly see in the UI, check the uid on the project's
+environment settings page and use that.
 
 ## CI metadata auto-detection
 

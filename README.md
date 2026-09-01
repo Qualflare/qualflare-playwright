@@ -105,6 +105,12 @@ Every option has an environment-variable override, and everything has a sensible
 [`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md). There is no `token` option: this reporter makes
 no requests, so it has no credential.
 
+One option is worth calling out because it fails late: `environment` is matched against the
+environment's **uid (slug)**, not its display name, so **Staging** in the UI is `staging` here. A
+wrong value cannot fail at test time — the reporter makes no requests — so the run succeeds and
+`collect` 404s afterwards. See
+[the note in the configuration docs](./docs/CONFIGURATION.md#environment-is-matched-by-uid-not-display-name).
+
 ## Known limitations
 
 - **Traces are not uploaded.** Playwright traces are `application/zip`, which Qualflare's attachment
