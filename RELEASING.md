@@ -40,6 +40,10 @@ Beyond the steps above, before the first `1.0.0`:
       drifted).
 - [ ] README quickstart tested by someone who hasn't worked on this package, following it verbatim
       in a fresh Playwright project.
-- [ ] Decide deliberately whether `BeforeAll`/`AfterAll` attachment capture and per-attempt retry
-      detail (both documented v1 gaps in `docs/LIMITATIONS.md`) are worth a backend extension before
-      1.0, or stay out of scope.
+- [ ] Decide deliberately whether `BeforeAll`/`AfterAll` attachment capture (a documented v1 gap in
+      `docs/LIMITATIONS.md`) is worth a backend extension before 1.0, or stays out of scope.
+
+      Per-attempt retry detail, previously listed here alongside it, is **done**: the backend
+      extension exists (`case_run_attempts`) and this reporter fills it via `Case.attempts`. What
+      remains collapsed to the final attempt is steps and metadata, deliberately — see
+      `docs/LIMITATIONS.md`.
