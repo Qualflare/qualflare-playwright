@@ -23,6 +23,11 @@ export const MAX_LINKS_PER_CASE = 20;
 export const MAX_TAGS_PER_CASE = 64;
 export const MAX_TAG_LENGTH = 255;
 
+/** Mirrors `launch.MaxCaseAttempts`. Beyond this the server keeps the first
+ * 49 attempts plus the final one and drops the middle, so sending more is
+ * wasted payload rather than an error. */
+export const MAX_ATTEMPTS_PER_CASE = 50;
+
 /** Mirrors `launch.MaxAttachmentUploadFileSize` — the server's hard cap on a
  * single `POST /api/v1/attachments/upload-url` request (video). */
 export const MAX_VIDEO_UPLOAD_BYTES = 50 * 1024 * 1024;
