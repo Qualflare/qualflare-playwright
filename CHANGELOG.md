@@ -5,6 +5,26 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- Per-attempt execution history on every retried test, sent as `Case.attempts`.
+
+  Until now a retried test reported only `retryCount` and `isFlaky` — that it was retried
+  twice, but nothing about *what* went wrong each time. Playwright already gives the reporter
+  the full `test.results[]`, so every intermediate attempt's status, duration, start time,
+  error message, stack, snippet, source line and captured stdout/stderr were being computed
+  and then thrown away.
+
+  Each attempt is now sent individually, including the final one — the server takes the
+  final attempt's status and duration from the case itself so the two can never disagree,
+  but keeps that attempt's own error text.
+
+  A test that was not retried sends nothing: a single attempt has no history beyond what the
+  case already carries, and the server discards it. Requires an API that stores attempt
+  history; older servers ignore the field.
+
 ## 0.2.0
 
 ### Added

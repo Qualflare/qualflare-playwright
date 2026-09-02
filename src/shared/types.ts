@@ -131,6 +131,53 @@ export interface Attachment {
   stepIndex?: number;
 }
 
+/**
+ * One execution of a test, when the framework retried it.
+ *
+ * Sent as `Case.attempts`, persisted per-attempt server-side (see
+ * `case_run_attempts`). This is what lets a report answer "what failed on the
+ * first try?" rather than only "it was retried twice" — `retryCount`/`isFlaky`
+ * are aggregates and cannot.
+ *
+ * Three rules the server relies on:
+ *
+ * 1. **Send every attempt, including the final one**, numbered 1..N. The
+ *    server treats the highest-numbered attempt as the final execution and
+ *    overwrites its `status`/`duration` from the Case itself, so the two can
+ *    never disagree — but it keeps this attempt's own `message`/`trace`, which
+ *    is precisely why the final attempt must be sent rather than inferred.
+ * 2. **Fewer than two attempts persists nothing.** A test that ran once has no
+ *    history worth storing, so omit `attempts` entirely rather than sending a
+ *    single-element array; it is bytes against the 10MB body limit for a row
+ *    the server will discard.
+ * 3. **`attempt` must be >= 1.** Zero-based numbering is silently dropped.
+ */
+export interface Attempt {
+  /** 1-based. Must be >= 1; the server drops anything lower. */
+  attempt: number;
+  status: CaseStatus;
+  /** NANOSECONDS — see `NanosecondDuration`. */
+  duration?: NanosecondDuration;
+  /** ISO-8601. When this attempt started. */
+  startedAt?: string;
+  /** The framework's own id for this attempt, passed through untouched.
+   * Max 255 chars server-side. */
+  attemptId?: string;
+  /** Truncated server-side at 8192 runes, never validation-rejected. */
+  message?: string;
+  /** Stack trace. Truncated server-side at 32768 runes. */
+  trace?: string;
+  /** Source snippet. Truncated server-side at 4096 runes. */
+  snippet?: string;
+  /** 1-based source line the failure points at. */
+  line?: number;
+  /** Captured stdout, one entry per line. Server keeps the first 200 lines,
+   * then truncates to 16384 runes. */
+  stdout?: string[];
+  /** Captured stderr, same bounds as `stdout`. */
+  stderr?: string[];
+}
+
 export interface Case {
   /** Required. A stable per-test identifier used for flaky-history matching
    * across separate runs — must stay the same for what a human would call
@@ -146,6 +193,10 @@ export interface Case {
   /** NANOSECONDS — see `NanosecondDuration`. */
   duration: NanosecondDuration;
   retryCount?: number;
+  /** Per-attempt execution history, present only when the framework retried
+   * this test (>= 2 entries). Omitted otherwise — a single attempt persists
+   * nothing server-side. See `Attempt`. */
+  attempts?: Attempt[];
   isFlaky?: boolean;
   /** Truncated server-side at 65536 runes, never validation-rejected — send
    * the full error/stack text, don't pre-truncate. */
