@@ -5,6 +5,11 @@ import type { TestCase, TestResult } from '@playwright/test/reporter';
 import type { ResolvedReporterConfig } from '../config/resolve-config.js';
 import {
   MAX_ATTEMPTS_PER_CASE,
+  MAX_ATTEMPT_MESSAGE_RUNES,
+  MAX_ATTEMPT_OUTPUT_LINES,
+  MAX_ATTEMPT_OUTPUT_RUNES,
+  MAX_ATTEMPT_SNIPPET_RUNES,
+  MAX_ATTEMPT_TRACE_RUNES,
   MAX_LABELS_PER_CASE,
   MAX_LINKS_PER_CASE,
   MAX_TAGS_PER_CASE,
@@ -12,6 +17,7 @@ import {
   RESERVED_MESSAGE_MEDIA_TYPE,
 } from '../shared/constants.js';
 import { msToNs } from '../shared/duration.js';
+import { clampOutputLines, truncateRunes } from '../shared/text.js';
 import { logger } from '../shared/logger.js';
 import type { Attachment, Attempt, Case, CaseStatus, Label, Link, Parameter, Step } from '../shared/types.js';
 import type { RuntimeMessage } from '../runtime/message-types.js';
@@ -89,10 +95,12 @@ function outputLines(chunks: ReadonlyArray<string | Buffer> | undefined): string
   const text = chunks.map((c) => (typeof c === 'string' ? c : c.toString('utf8'))).join('');
   const lines = stripAnsi(text).split('\n');
   // A trailing newline yields a final empty element that is not a real line.
-  if (lines.length > 0 && lines[lines.length - 1] === '') {
+  while (lines.length > 0 && lines[lines.length - 1] === '') {
     lines.pop();
   }
-  return lines.length > 0 ? lines : undefined;
+  // Bounded to what the server actually stores. Playwright captures everything
+  // a test prints, so this is the field that makes an attempt unboundedly large.
+  return clampOutputLines(lines, MAX_ATTEMPT_OUTPUT_LINES, MAX_ATTEMPT_OUTPUT_RUNES);
 }
 
 /**
@@ -151,13 +159,13 @@ export function buildAttempts(results: readonly TestResult[]): Attempt[] | undef
     if (err) {
       const message = err.message ?? err.value;
       if (message) {
-        attempt.message = stripAnsi(message);
+        attempt.message = truncateRunes(stripAnsi(message), MAX_ATTEMPT_MESSAGE_RUNES);
       }
       if (err.stack) {
-        attempt.trace = stripAnsi(err.stack);
+        attempt.trace = truncateRunes(stripAnsi(err.stack), MAX_ATTEMPT_TRACE_RUNES);
       }
       if (err.snippet) {
-        attempt.snippet = stripAnsi(err.snippet);
+        attempt.snippet = truncateRunes(stripAnsi(err.snippet), MAX_ATTEMPT_SNIPPET_RUNES);
       }
       if (typeof err.location?.line === 'number') {
         attempt.line = err.location.line;
