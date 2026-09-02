@@ -4,6 +4,7 @@ import type { TestCase, TestResult } from '@playwright/test/reporter';
 
 import type { ResolvedReporterConfig } from '../config/resolve-config.js';
 import {
+  MAX_ATTEMPTS_PER_CASE,
   MAX_LABELS_PER_CASE,
   MAX_LINKS_PER_CASE,
   MAX_TAGS_PER_CASE,
@@ -12,7 +13,7 @@ import {
 } from '../shared/constants.js';
 import { msToNs } from '../shared/duration.js';
 import { logger } from '../shared/logger.js';
-import type { Attachment, Case, CaseStatus, Label, Link, Parameter, Step } from '../shared/types.js';
+import type { Attachment, Attempt, Case, CaseStatus, Label, Link, Parameter, Step } from '../shared/types.js';
 import type { RuntimeMessage } from '../runtime/message-types.js';
 import { AttachmentBudget, inlineFromBuffer, inlineFromFile } from './attachment-reader.js';
 import { mapSteps } from './step-mapper.js';
@@ -71,6 +72,109 @@ function formatError(result: TestResult): string | undefined {
     parts.push('', stripAnsi(err.stack));
   }
   return parts.join('\n');
+}
+
+/**
+ * Captured process output as the wire wants it: one array entry per line.
+ *
+ * Playwright hands back `(string | Buffer)[]` where each entry is whatever
+ * chunk the stream happened to flush, so a single entry may hold many lines or
+ * a partial one. Splitting on newlines here means the server's 200-LINE cap
+ * counts real lines rather than arbitrary flush boundaries.
+ */
+function outputLines(chunks: ReadonlyArray<string | Buffer> | undefined): string[] | undefined {
+  if (!chunks || chunks.length === 0) {
+    return undefined;
+  }
+  const text = chunks.map((c) => (typeof c === 'string' ? c : c.toString('utf8'))).join('');
+  const lines = stripAnsi(text).split('\n');
+  // A trailing newline yields a final empty element that is not a real line.
+  if (lines.length > 0 && lines[lines.length - 1] === '') {
+    lines.pop();
+  }
+  return lines.length > 0 ? lines : undefined;
+}
+
+/**
+ * Builds the per-attempt history for one test, or `undefined` when there is
+ * nothing worth sending.
+ *
+ * # Why every attempt is sent, including the last
+ *
+ * The server treats the highest-numbered attempt as the final execution and
+ * overwrites its `status`/`duration` from the Case itself, so a client cannot
+ * make the case row and its final attempt row disagree. It keeps that
+ * attempt's own `message`/`trace` though — which is exactly why the final
+ * attempt has to be sent rather than left to be inferred.
+ *
+ * # Why a single attempt sends nothing
+ *
+ * A test that ran once has no history: the Case already carries that status,
+ * duration and error. The server discards a one-element array, so sending it
+ * would be payload spent against the 10MB body limit on a row that is dropped.
+ *
+ * # Why the error is split rather than reused
+ *
+ * `formatError` flattens message + snippet + stack into the Case's single
+ * `error` string, because that is all the Case has room for. An Attempt has
+ * separate `message`/`trace`/`snippet`/`line` fields, so they are mapped
+ * individually — the attempt history is strictly richer than a per-attempt
+ * copy of `error` would be.
+ */
+export function buildAttempts(results: readonly TestResult[]): Attempt[] | undefined {
+  if (results.length < 2) {
+    return undefined;
+  }
+
+  // Beyond the server's cap it keeps the first 49 and the final one, dropping
+  // the middle. Doing the same here means the bytes are never sent at all,
+  // and — crucially — that the FINAL attempt survives the trim, which a plain
+  // `slice(0, 50)` would discard.
+  let kept: readonly TestResult[] = results;
+  if (results.length > MAX_ATTEMPTS_PER_CASE) {
+    kept = [...results.slice(0, MAX_ATTEMPTS_PER_CASE - 1), results[results.length - 1]!];
+  }
+
+  return kept.map((r, i) => {
+    const err = r.error;
+    const attempt: Attempt = {
+      // 1-based and contiguous. Deliberately the index rather than
+      // `r.retry`: results are already ordered by attempt, and a filtered-out
+      // never-ran result would leave a hole in the retry numbering that the
+      // server reads as a truncated history.
+      attempt: i + 1,
+      status: mapStatus(r.status),
+      duration: msToNs(r.duration),
+      startedAt: r.startTime.toISOString(),
+    };
+
+    if (err) {
+      const message = err.message ?? err.value;
+      if (message) {
+        attempt.message = stripAnsi(message);
+      }
+      if (err.stack) {
+        attempt.trace = stripAnsi(err.stack);
+      }
+      if (err.snippet) {
+        attempt.snippet = stripAnsi(err.snippet);
+      }
+      if (typeof err.location?.line === 'number') {
+        attempt.line = err.location.line;
+      }
+    }
+
+    const stdout = outputLines(r.stdout);
+    if (stdout) {
+      attempt.stdout = stdout;
+    }
+    const stderr = outputLines(r.stderr);
+    if (stderr) {
+      attempt.stderr = stderr;
+    }
+
+    return attempt;
+  });
 }
 
 interface ReplayedMetadata {
@@ -276,6 +380,7 @@ export function buildCase(
   const nativeTags = (test as { tags?: string[] }).tags ?? [];
   const tags = capTags([...nativeTags, ...meta.tags]);
   const error = formatError(final);
+  const attempts = buildAttempts(results);
 
   return {
     id: test.id,
@@ -285,6 +390,7 @@ export function buildCase(
     duration: msToNs(final.duration),
     retryCount: results.length - 1,
     isFlaky: outcome === 'flaky',
+    ...(attempts ? { attempts } : {}),
     ...(error ? { error } : {}),
     ...(meta.priority ? { priority: meta.priority } : {}),
     ...(meta.description ? { description: meta.description } : {}),
