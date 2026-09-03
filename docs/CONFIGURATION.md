@@ -45,6 +45,7 @@ There is **no `token` option**. This reporter makes no network calls, so it has 
 | `maxAttachmentBytes` | `QUALFLARE_MAX_ATTACHMENT_BYTES` | `1500000` | Per-attachment cap for inline (base64) attachments. |
 | `maxTotalAttachmentBytes` | `QUALFLARE_MAX_TOTAL_ATTACHMENT_BYTES` | `750000` | Whole-run inline budget. Conservative on purpose. Videos are exempt — they are copied, not inlined. |
 | `maxVideoBytes` | `QUALFLARE_MAX_VIDEO_BYTES` | `52428800` (50MB) | Checked with `stat` before a video is copied, so an oversized file is never copied just to be discarded. |
+| `maxTraceBytes` | `QUALFLARE_MAX_TRACE_BYTES` | `52428800` (50MB) | Per-trace cap, checked with `stat` before the zip is copied, so an oversized trace is never written just to be rejected at collect time. Matches the server's own attachment cap. Uploading a trace at all is opt-in on the CLI side — `qf collect --upload-artifacts=trace`. |
 | `debug` | `QUALFLARE_DEBUG` → `QF_DEBUG` | `false` | Extra detail on stderr. |
 
 ## Branch and commit auto-detection

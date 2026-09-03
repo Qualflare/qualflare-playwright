@@ -58,6 +58,12 @@ npx playwright test
 qf <your-project-identifier> collect ./qualflare-results
 ```
 
+> **Videos and traces are opt-in from `@qualflare/cli` v0.1.20.** `collect` uploads the report
+> itself always, but a heavy artifact only when asked: `--upload-artifacts=video`, `=trace`, or
+> `=video,trace` (or `QF_UPLOAD_ARTIFACTS`). Earlier CLI versions uploaded every video
+> automatically. Nothing is dropped silently — `collect` prints how many artifacts it skipped and
+> the exact flag to include them.
+
 ### Sharded CI
 
 Point every shard at the **same** `outputDir` and collect once at the end. Each process writes its
