@@ -46,6 +46,12 @@ export const MAX_ATTEMPT_OUTPUT_LINES = 200;
  * single `POST /api/v1/attachments/upload-url` request (video). */
 export const MAX_VIDEO_UPLOAD_BYTES = 50 * 1024 * 1024;
 
+/** Cap on one Playwright trace zip. Matches MAX_VIDEO_UPLOAD_BYTES because both
+ * end up at the same server-side limit: the attachment upload endpoint rejects
+ * anything past 50MB regardless of kind. Copying a larger trace would only
+ * defer the rejection to collect time, after the bytes were already written. */
+export const MAX_TRACE_UPLOAD_BYTES = 50 * 1024 * 1024;
+
 /** Client-side SOFT cap on steps recorded per scenario attempt — well under
  * the server's 1000-per-case hard cap (`MAX_STEPS_PER_CASE`). Once hit,
  * further steps within that attempt are dropped (with a one-time warning),
