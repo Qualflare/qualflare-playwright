@@ -7,7 +7,7 @@
 A native Playwright reporter for [Qualflare](https://qualflare.com) — captures test results directly
 from your `playwright test` run: status, per-attempt retry history and flakiness, nested
 `test.step()` trees,
-screenshots, videos, and author-facing metadata (labels, links, tags, priority, custom attachments).
+screenshots, videos, traces, and author-facing metadata (labels, links, tags, priority, custom attachments).
 
 The reporter itself makes **no network calls**. It writes a report directory, and
 [`qualflare-cli`](https://github.com/Qualflare/qualflare-cli) uploads it — which is what lets any
@@ -114,9 +114,9 @@ wrong value cannot fail at test time — the reporter makes no requests — so t
 
 ## Known limitations
 
-- **Traces are not uploaded.** Playwright traces are `application/zip`, which Qualflare's attachment
-  upload endpoint rejects. They are deliberately not attached rather than attached as a link to
-  nothing.
+- **Traces need `--upload-artifacts=trace` at collect time.** The zip is copied into `outputDir`,
+  but `qf collect` uploads no heavy artifact unless asked — pass `--upload-artifacts=trace` (or
+  `video,trace`). Needs `@qualflare/cli` v0.1.20+; older CLIs ignore it.
 - **`pw:api` and `fixture` steps are filtered out by default** (`includeApiSteps`) — a single
   browser test emits hundreds, which buries the steps you actually wrote. A *failed* one is always
   kept.

@@ -6,7 +6,7 @@ import { MAX_ATTACHMENTS_PER_CASE, RESERVED_MESSAGE_MEDIA_TYPE } from '../shared
 import { logger } from '../shared/logger.js';
 import type { Attachment } from '../shared/types.js';
 import type { ResolvedReporterConfig } from '../config/resolve-config.js';
-import { copyVideoAttachment } from './video-writer.js';
+import { copyTraceAttachment, copyVideoAttachment } from './video-writer.js';
 
 /** Running total of inline attachment bytes for one reporter process, so a
  * single pathological run can't push a launch past the server's body limit.
@@ -41,6 +41,7 @@ export class AttachmentBudget {
  * `use.trace` produce exactly these). */
 const NAME_VIDEO = 'video';
 const NAME_TRACE = 'trace';
+const TRACE_CONTENT_TYPE = 'application/zip';
 
 function isVideo(a: TestResult['attachments'][number]): boolean {
   return a.name === NAME_VIDEO || (a.contentType?.startsWith('video/') ?? false);
@@ -56,10 +57,11 @@ function isVideo(a: TestResult['attachments'][number]): boolean {
  *    This is the ONLY path `qualflare-cli` uploads to blob storage.
  *  - **everything else with bytes** -> inlined as base64 `content`, subject to
  *    the per-attachment and per-run budgets.
- *  - **trace** -> dropped, deliberately. Traces are `application/zip`, which
- *    the upload endpoint's MIME allowlist rejects, and they are far too large
- *    to inline. Attaching one would produce a row pointing at nothing. See
- *    docs/LIMITATIONS.md.
+ *  - **trace** -> copied into `outputDir`, referenced by `localTracePath`.
+ *    Traces are `application/zip`, which the upload endpoint's MIME allowlist
+ *    rejected until it was widened; they are far too large to inline. The
+ *    upload is opt-in on the CLI side (`--upload-artifacts=trace`), so a trace
+ *    written here is not automatically a trace uploaded.
  *
  * A bare `path` is never emitted on its own: the server treats `path` as
  * informational and never fetches it, so a path-only attachment is a row the
@@ -92,7 +94,22 @@ export function resolveAttachments(
       break;
     }
 
-    if (a.name === NAME_TRACE || a.contentType === 'application/zip') {
+    if (a.name === NAME_TRACE || a.contentType === TRACE_CONTENT_TYPE) {
+      if (!a.path) {
+        // Playwright always writes a trace to disk; an in-memory one would have
+        // to be inlined, and a trace is far past the inline budget.
+        logger.warn(`skipping in-memory trace attachment "${a.name}": only file-backed traces are supported.`);
+        continue;
+      }
+      const copied = copyTraceAttachment(a.path, config.outputDir, config.maxTraceBytes);
+      if (copied) {
+        out.push({
+          name: a.name,
+          mimeType: copied.mimeType,
+          localTracePath: copied.localTracePath,
+          fileSize: copied.fileSize,
+        });
+      }
       continue;
     }
 
