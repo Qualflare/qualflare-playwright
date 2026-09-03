@@ -156,11 +156,24 @@ describe('qualflare-playwright against a real playwright run', () => {
       // claiming an upload it never performed.
       expect(video.storageKey).toBeUndefined();
 
-      // Traces are application/zip, which the upload endpoint's MIME
-      // allowlist rejects — attaching one would produce a row pointing at
-      // nothing. See docs/LIMITATIONS.md.
+      // Traces are attached now that the upload endpoint's MIME allowlist
+      // accepts application/zip. Like videos they are copied into outputDir
+      // and referenced by path, never inlined — a trace is far past the inline
+      // budget. Whether one is UPLOADED is the CLI's call
+      // (--upload-artifacts=trace); the reporter's job is to write it.
       const everyAttachmentName = allCases.flatMap((c) => (c.attachments ?? []).map((a: { name: string }) => a.name));
-      expect(everyAttachmentName).not.toContain('trace');
+      expect(everyAttachmentName).toContain('trace');
+
+      const trace = allCases
+        .flatMap((c) => c.attachments ?? [])
+        .find((a: { name: string }) => a.name === 'trace');
+      expect(trace.mimeType).toBe('application/zip');
+      expect(trace.localTracePath).toMatch(/\.zip$/);
+      expect(trace.content).toBeUndefined();
+      expect(trace.storageKey).toBeUndefined();
+      const tracePath = path.join(outputDir, trace.localTracePath);
+      expect(fs.existsSync(tracePath)).toBe(true);
+      expect(trace.fileSize).toBe(fs.statSync(tracePath).size);
 
       // The author-facing metadata API.
       const meta = allCases.find((c) => c.name.startsWith('exercises the author-facing metadata calls'));

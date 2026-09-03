@@ -123,6 +123,10 @@ export interface Attachment {
    * Relative to the report file's own directory. Never sent to `/collect`
    * directly; mutually exclusive with `content`/`storageKey`. */
   localVideoPath?: string;
+  /** Filename of a Playwright trace zip copied into `outputDir`, relative to
+   * it. Read by `@qualflare/cli` v0.1.20+, which uploads it only when
+   * `--upload-artifacts=trace` asks; an older CLI ignores the field. */
+  localTracePath?: string;
   /** Byte size of the object at `storageKey`. Ignored when `storageKey` is
    * unset. */
   fileSize?: number;

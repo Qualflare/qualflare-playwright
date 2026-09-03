@@ -3,17 +3,26 @@
 Deliberate boundaries of `@qualflare/playwright`, with the reasoning behind each. Everything here
 is a considered trade-off rather than an oversight.
 
-## Traces are not uploaded
+## Traces need `--upload-artifacts=trace`
 
-Playwright's trace (`use.trace`) is its best debugging artifact, and this reporter **does not attach
-it**.
+Playwright's trace (`use.trace`) is its best debugging artifact, and this reporter now attaches it:
+the zip is copied into `outputDir` and referenced by `localTracePath`, the same shape videos use.
 
-Traces are `application/zip`. Qualflare's attachment-upload endpoint validates the MIME type against
-a video-only allowlist (`video/mp4`, `video/webm`, `video/quicktime`) and rejects anything else, and
-a trace is far too large to inline as base64 under the per-attachment cap. Attaching one anyway
-would produce a row in the UI that can never be opened, which is worse than not showing it at all.
+It was dropped entirely before v0.4.0. The blocker was never Playwright or this reporter — Qualflare's
+attachment-upload endpoint validated against a video-only MIME allowlist and rejected
+`application/zip`. Widening that allowlist is what made traces possible.
 
-Traces still work normally in Playwright itself — `npx playwright show-trace` is unaffected.
+Two things to know:
+
+- **The upload is opt-in.** `qf collect` uploads no heavy artifact by default; pass
+  `--upload-artifacts=trace` (or `video,trace`) or set `QF_UPLOAD_ARTIFACTS`. A trace written into
+  `outputDir` is not automatically a trace uploaded, and `collect` prints what it skipped.
+- **Needs `@qualflare/cli` v0.1.20+.** An older CLI ignores `localTracePath` entirely, so the zip
+  sits in `outputDir` and never reaches a launch.
+
+`maxTraceBytes` (default 50MB, matching the server's own cap) bounds one trace, checked with
+`fs.statSync` before anything is copied. Traces still work normally in Playwright itself either way —
+`npx playwright show-trace` is unaffected.
 
 ## Videos are written, not uploaded
 
@@ -82,7 +91,7 @@ Needs `@qualflare/cli` v0.1.19 or newer. An older CLI ignores `runId` and merges
 ### `merge-reports` mode is not supported
 
 Playwright has its own shard-merging flow (the `blob` reporter plus `npx playwright merge-reports`).
-This reporter is not designed to run inside it in v0.1.0. Use the `outputDir` flow above instead.
+This reporter is not designed to run inside it. Use the `outputDir` flow above instead.
 
 The blocker is worth recording for whoever adds it: in merge mode Playwright deliberately does
 **not** deduplicate projects — a project sharded across 5 machines appears as 5 distinct project

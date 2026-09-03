@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { MAX_VIDEO_UPLOAD_BYTES } from '../shared/constants.js';
+import { MAX_TRACE_UPLOAD_BYTES, MAX_VIDEO_UPLOAD_BYTES } from '../shared/constants.js';
 import type { Platform } from '../shared/types.js';
 import { detectCi, type CiMetadata } from './ci-detect.js';
 import { detectGit, type GitInfo } from './git-detect.js';
@@ -53,6 +53,10 @@ export interface QualflarePlaywrightOptions {
   /** Per-video byte cap, checked before the file is written. Default 50MB,
    * matching the server's own hard cap. */
   maxVideoBytes?: number;
+  /** Cap on a single Playwright trace zip copied into `outputDir`. Traces are
+   * larger than videos in some suites, but the server rejects anything past its
+   * own 50MB cap, so the default matches it. */
+  maxTraceBytes?: number;
   debug?: boolean;
   /** `false` fully disables accumulation/upload (a complete no-op) but the
    * reporter still no-ops cleanly rather than throwing. */
@@ -102,6 +106,7 @@ export interface ResolvedReporterConfig {
   maxAttachmentBytes: number;
   maxTotalAttachmentBytes: number;
   maxVideoBytes: number;
+  maxTraceBytes: number;
   debug: boolean;
   enabled: boolean;
   outputDir: string;
@@ -228,6 +233,7 @@ export function resolveConfig(
     maxTotalAttachmentBytes:
       options.maxTotalAttachmentBytes ?? envInt('QUALFLARE_MAX_TOTAL_ATTACHMENT_BYTES') ?? 750_000,
     maxVideoBytes: options.maxVideoBytes ?? envInt('QUALFLARE_MAX_VIDEO_BYTES') ?? MAX_VIDEO_UPLOAD_BYTES,
+    maxTraceBytes: options.maxTraceBytes ?? envInt('QUALFLARE_MAX_TRACE_BYTES') ?? MAX_TRACE_UPLOAD_BYTES,
     debug: options.debug ?? envBool('QUALFLARE_DEBUG', 'QF_DEBUG') ?? false,
     enabled,
     outputDir,

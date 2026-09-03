@@ -181,7 +181,8 @@ export default class QualflareReporter implements Reporter {
   }
 
   /** Drops everything an earlier, now-superseded attempt produced: deletes the
-   * video copied into outputDir and refunds its bytes to the run budget. */
+   * video or trace copied into outputDir and refunds its bytes to the run
+   * budget. */
   private discardSupersededAttempt(testId: string, retry: number, outputDir: string): void {
     const previous = this.latestAttemptByTest.get(testId);
     if (previous === undefined || previous >= retry) {
@@ -189,9 +190,12 @@ export default class QualflareReporter implements Reporter {
     }
     const key = `${testId}:${previous}`;
     for (const attachment of this.attachmentsByResult.get(key) ?? []) {
-      if (attachment.localVideoPath) {
+      // Both heavy artifacts are copied into outputDir, so both leak if a
+      // superseded attempt's copy is left behind.
+      const orphan = attachment.localVideoPath ?? attachment.localTracePath;
+      if (orphan) {
         try {
-          fs.rmSync(path.join(this.resolveOutputDir(outputDir), attachment.localVideoPath), { force: true });
+          fs.rmSync(path.join(this.resolveOutputDir(outputDir), orphan), { force: true });
         } catch {
           // Best effort: an orphan left on disk is untidy, never incorrect.
         }
