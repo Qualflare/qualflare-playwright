@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 0.3.0
 
 ### Added
 
@@ -24,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A test that was not retried sends nothing: a single attempt has no history beyond what the
   case already carries, and the server discards it. Requires an API that stores attempt
   history; older servers ignore the field.
+
+  Attempt text is bounded to what the server stores: `message` 8192 characters, `trace` 32768,
+  `snippet` 4096, and `stdout`/`stderr` 200 lines or 16384 characters each, whichever comes
+  first. A chatty retried test would otherwise serialize to hundreds of KB of text the server
+  discards on write — enough of them to exceed the request body limit and lose the whole
+  launch. The Case's own `error` field is unaffected.
 
 ## 0.2.0
 
