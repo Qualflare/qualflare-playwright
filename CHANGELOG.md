@@ -5,6 +5,29 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.4.0
+
+### Added
+
+- **Playwright traces are attached.** The trace zip is copied into `outputDir` and referenced by
+  `localTracePath`, the same shape videos use. Traces were dropped entirely before this: Qualflare's
+  attachment-upload endpoint validated against a video-only MIME allowlist and rejected
+  `application/zip`, so an attached trace would have been a row pointing at nothing. Widening that
+  allowlist server-side is what made it possible.
+
+  The upload is opt-in on the CLI side — pass `--upload-artifacts=trace` (or `video,trace`) to
+  `qf collect`. A trace written into `outputDir` is not automatically a trace uploaded. Requires
+  `@qualflare/cli` v0.1.20 or newer; an older CLI ignores the field.
+
+- `maxTraceBytes` (`QUALFLARE_MAX_TRACE_BYTES`, default 50MB to match the server cap), checked with
+  `fs.statSync` before anything is copied so an oversized trace is never written just to be rejected
+  at collect time.
+
+### Fixed
+
+- A superseded retry attempt now cleans up its orphaned trace as well as its video.
+- The `merge-reports` limitation no longer claims to be about "v0.1.0".
+
 ## 0.3.0
 
 ### Added
