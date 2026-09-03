@@ -5,7 +5,8 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 
 A native Playwright reporter for [Qualflare](https://qualflare.com) — captures test results directly
-from your `playwright test` run: status, real retry counts and flakiness, nested `test.step()` trees,
+from your `playwright test` run: status, per-attempt retry history and flakiness, nested
+`test.step()` trees,
 screenshots, videos, and author-facing metadata (labels, links, tags, priority, custom attachments).
 
 The reporter itself makes **no network calls**. It writes a report directory, and
@@ -112,7 +113,6 @@ wrong value cannot fail at test time — the reporter makes no requests — so t
 [the note in the configuration docs](./docs/CONFIGURATION.md#environment-is-matched-by-uid-not-display-name).
 
 ## Known limitations
-
 - **Traces are not uploaded.** Playwright traces are `application/zip`, which Qualflare's attachment
   upload endpoint rejects. They are deliberately not attached rather than attached as a link to
   nothing.
@@ -122,8 +122,22 @@ wrong value cannot fail at test time — the reporter makes no requests — so t
 - **A stale `outputDir` is refused, not merged** — each report carries a `runId`, and `qf collect`
   errors rather than merging files from two different runs. Needs `@qualflare/cli` v0.1.19+; older
   CLIs merge as before.
-- **`merge-reports` mode is not supported** in v0.1.0 — use the `outputDir` flow above rather than
+- **`merge-reports` mode is not supported** — use the `outputDir` flow above rather than
   Playwright's `blob` reporter.
+- **Playwright-native `tag` needs 1.42+** while the peer floor is 1.40 — on 1.40/1.41 the
+  native tag array is not read; `qualflare.tag()` works throughout.
+- **`parameter()` outside a step is not masked** — `masked` is a display hint for the UI; the
+  server never redacts the value, so never put a real secret in one. See
+  [`docs/LIMITATIONS.md`](./docs/LIMITATIONS.md#parameter-outside-a-step-has-no-masking).
+- **Attachment caps are two budgets, not one pool** — `maxAttachmentBytes` bounds a single
+  attachment and `maxTotalAttachmentBytes` the whole run; anything over either is dropped
+  outright rather than truncated. Raising them is the easiest way to push a request past
+  `/collect`'s body limit. See
+  [`docs/LIMITATIONS.md`](./docs/LIMITATIONS.md#per-case-and-per-attachment-caps-are-independent-not-pooled).
+- **Retries carry per-attempt errors, but everything else is the final attempt** — `Case.attempts`
+  records each attempt's status, duration and error; steps, labels, links, tags, priority,
+  properties and attachments come from the last attempt only, so an abandoned attempt's step trace
+  is discarded rather than replayed alongside the final one.
 
 Full details in [`docs/LIMITATIONS.md`](./docs/LIMITATIONS.md).
 
