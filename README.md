@@ -113,6 +113,7 @@ wrong value cannot fail at test time — the reporter makes no requests — so t
 [the note in the configuration docs](./docs/CONFIGURATION.md#environment-is-matched-by-uid-not-display-name).
 
 ## Known limitations
+
 - **Traces are not uploaded.** Playwright traces are `application/zip`, which Qualflare's attachment
   upload endpoint rejects. They are deliberately not attached rather than attached as a link to
   nothing.
