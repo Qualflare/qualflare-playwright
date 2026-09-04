@@ -229,9 +229,20 @@ export function resolveConfig(
     runId,
     attachScreenshots: options.attachScreenshots ?? envBool('QUALFLARE_ATTACH_SCREENSHOTS') ?? true,
     includeApiSteps: options.includeApiSteps ?? envBool('QUALFLARE_INCLUDE_API_STEPS') ?? false,
-    maxAttachmentBytes: options.maxAttachmentBytes ?? envInt('QUALFLARE_MAX_ATTACHMENT_BYTES') ?? 1_500_000,
+    // 5MB per attachment, 10MB per run. These were 1.5MB/750KB while every
+    // attachment was base64-inlined into /collect's 10MB body, where they
+    // competed with the test results — and since collect merges every shard into
+    // ONE request, the per-run number had to assume it was one of many.
+    //
+    // @qualflare/cli v0.1.22+ uploads attachments out of band and references a
+    // storageKey, so the body no longer grows with them and these numbers only
+    // bound the report file on disk. REQUIRES that CLI: an older one still
+    // inlines, and these limits would push it past the body limit and fail the
+    // whole launch. Still bounded rather than unlimited, so the worst case is
+    // one launch and not an out-of-memory.
+    maxAttachmentBytes: options.maxAttachmentBytes ?? envInt('QUALFLARE_MAX_ATTACHMENT_BYTES') ?? 5_000_000,
     maxTotalAttachmentBytes:
-      options.maxTotalAttachmentBytes ?? envInt('QUALFLARE_MAX_TOTAL_ATTACHMENT_BYTES') ?? 750_000,
+      options.maxTotalAttachmentBytes ?? envInt('QUALFLARE_MAX_TOTAL_ATTACHMENT_BYTES') ?? 10_000_000,
     maxVideoBytes: options.maxVideoBytes ?? envInt('QUALFLARE_MAX_VIDEO_BYTES') ?? MAX_VIDEO_UPLOAD_BYTES,
     maxTraceBytes: options.maxTraceBytes ?? envInt('QUALFLARE_MAX_TRACE_BYTES') ?? MAX_TRACE_UPLOAD_BYTES,
     debug: options.debug ?? envBool('QUALFLARE_DEBUG', 'QF_DEBUG') ?? false,

@@ -120,27 +120,18 @@ wrong value cannot fail at test time — the reporter makes no requests — so t
 
 ## Known limitations
 
-- **Traces need `--upload-artifacts=trace` at collect time.** The zip is copied into `outputDir`,
-  but `qf collect` uploads no heavy artifact unless asked — pass `--upload-artifacts=trace` (or
-  `video,trace`). Needs `@qualflare/cli` v0.1.20+; older CLIs ignore it.
-- **`pw:api` and `fixture` steps are filtered out by default** (`includeApiSteps`) — a single
-  browser test emits hundreds, which buries the steps you actually wrote. A *failed* one is always
-  kept.
-- **A stale `outputDir` is refused, not merged** — each report carries a `runId`, and `qf collect`
-  errors rather than merging files from two different runs. Needs `@qualflare/cli` v0.1.19+; older
-  CLIs merge as before.
 - **`merge-reports` mode is not supported** — use the `outputDir` flow above rather than
   Playwright's `blob` reporter.
-- **Playwright-native `tag` needs 1.42+** while the peer floor is 1.40 — on 1.40/1.41 the
-  native tag array is not read; `qualflare.tag()` works throughout.
-- **`parameter()` outside a step is not masked** — `masked` is a display hint for the UI; the
-  server never redacts the value, so never put a real secret in one. See
-  [`docs/LIMITATIONS.md`](./docs/LIMITATIONS.md#parameter-outside-a-step-has-no-masking).
-- **Attachment caps are two budgets, not one pool** — `maxAttachmentBytes` bounds a single
-  attachment and `maxTotalAttachmentBytes` the whole run; anything over either is dropped
-  outright rather than truncated. Raising them is the easiest way to push a request past
-  `/collect`'s body limit. See
-  [`docs/LIMITATIONS.md`](./docs/LIMITATIONS.md#per-case-and-per-attachment-caps-are-independent-not-pooled).
+- **A masked `parameter()` value is redacted, not recoverable** — `{ masked: true }` now drops the
+  value before the report is written, so the secret never leaves the machine. Outside a step it
+  becomes `••••••` in the case's `properties`, which is a flat map with nowhere to put the flag.
+  There is no way to read the real value back afterwards. See
+  [`docs/LIMITATIONS.md`](./docs/LIMITATIONS.md#parameter-masking-redacts-the-value).
+- **Attachment caps still exist, but no longer risk the launch** — `maxAttachmentBytes` (5MB)
+  bounds one attachment and `maxTotalAttachmentBytes` (10MB) the whole run; anything over either is
+  dropped. Needs `@qualflare/cli` v0.1.22+, which uploads attachments out of band — on an older CLI
+  these limits can push the request past the server's body limit and fail the whole launch. See
+  [`docs/LIMITATIONS.md`](./docs/LIMITATIONS.md#attachment-caps).
 - **Retries carry per-attempt errors, but everything else is the final attempt** — `Case.attempts`
   records each attempt's status, duration and error; steps, labels, links, tags, priority,
   properties and attachments come from the last attempt only, so an abandoned attempt's step trace

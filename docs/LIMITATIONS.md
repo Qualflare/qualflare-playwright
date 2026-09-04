@@ -68,25 +68,29 @@ sharing a directory never overwrite each other.
 Requires [`@qualflare/cli`](https://github.com/Qualflare/qualflare-cli) **v0.1.17 or newer** — the
 first release that preserves `labels`/`links` and step nesting through `collect`.
 
-### Stale files are refused, not merged
+### A leftover report does not need clearing
 
 Each report carries `metadata.runId` — the identifier every shard of one run shares and different
-runs do not (`GITHUB_RUN_ID`, `CI_PIPELINE_ID`, and so on; a per-process UUID outside CI). If
-`collect` finds files from more than one run it refuses to upload and names them:
+runs do not (`GITHUB_RUN_ID`, `CI_PIPELINE_ID`, and so on; a per-process UUID outside CI). When
+`collect` finds files from more than one run it uploads the run that just finished and says what it
+left out:
 
 ```
-Error: 2 different runs found in the report files:
-    run 17244102887: 1 file(s)  (stale.json)
-    run 17244981923: 2 file(s)  (shard-0.json, shard-1.json)
-  A stale file from an earlier run would be merged into this launch.
-  Clear the output directory before each run, or pass --allow-mixed-runs to upload anyway
+ignored 1 file(s) from 1 earlier run(s) (--allow-mixed-runs to include them)
+Processing 2 test result file(s)...
+OK Test results collected successfully
 ```
 
-Clearing `outputDir` at the start of each run is still the tidier habit — in CI it is usually free,
-since the workspace is fresh — but forgetting now costs a failed upload rather than a launch
-quietly containing results nobody ran.
+Nothing is deleted — the older files stay on disk, they are simply not uploaded.
+`--allow-mixed-runs` merges every run into one launch instead, which is occasionally what you want
+when several tools write into one directory.
 
-Needs `@qualflare/cli` v0.1.19 or newer. An older CLI ignores `runId` and merges as before.
+There was a period where this was stricter than it needed to be: `collect` refused the whole upload
+and left you to clear the directory by hand. Before that it merged the stale file silently, which
+produced a launch that looked entirely plausible and contained results nobody ran.
+
+**On `@qualflare/cli` older than v0.1.21 you get one of those two older behaviours** — a refusal on
+v0.1.19–v0.1.20, and a silent merge before that.
 
 ### `merge-reports` mode is not supported
 
@@ -118,36 +122,56 @@ Two consequences worth knowing:
   retrying more than fifty times is pathological; the launch still succeeds and `retryCount` still
   reflects the true total.
 
-## `parameter()` outside a step has no masking
+## `parameter()` masking redacts the value
 
-`qualflare.parameter(name, value, { masked: true })` inside an open `qualflare.step()` attaches to
-that step and carries the masking hint. Outside any step, the parameter lands in `Case.properties`,
-which has no masking concept — the value is stored as-is.
+`{ masked: true }` drops the value before the report is written. The secret never leaves this
+process, so it is not stored server-side and cannot be read back through the API.
 
-`masked` is a **display hint for the UI in either case**. The server does not redact the value, and
-neither does this reporter. Do not pass a real secret expecting it to be protected.
+Inside a step, the parameter travels as `{ name, masked: true }` with no value, and the Qualflare UI
+renders `••••••` from the flag. Outside any step it lands in the case's `properties`, a flat
+`Record<string, string>` with nowhere to put the flag — so the value itself becomes `••••••`.
+Either way the report carries no secret.
 
-## Per-case and per-attachment caps are independent, not pooled
+**The value is unrecoverable.** That is the point, but it is worth stating: masking is not a display
+toggle you can undo later. Mask a value you may need to read back and it is gone.
 
-`maxAttachmentBytes` bounds any single attachment; `maxTotalAttachmentBytes` bounds the inline total
-for the whole run. An attachment that exceeds either is **dropped entirely**, never degraded to a
-path-only entry — the server treats `path` as informational and never fetches it, so a path-only
-attachment is a row a user can see but never open.
+This used to be a display hint only — the real value was sent, stored in plaintext and readable
+through the API, while the UI drew dots over it. Anyone who trusted the name got no protection at
+all, which is why the docs had to say "never put a real secret in one". They no longer do.
 
-Videos are exempt from the inline budget: they are copied to disk rather than inlined, and bounded
-separately by `maxVideoBytes`.
+## Attachment caps
 
-## Playwright-native tags need 1.42+
+`maxAttachmentBytes` (5MB) bounds a single attachment; `maxTotalAttachmentBytes` (10MB) bounds the
+run. Anything over either is dropped with a warning rather than truncated — a half-written screenshot
+is worse than none.
 
-`TestCase.tags` — the `@token`s Playwright parses out of test titles and the `tag` option on
-`test()`/`test.describe()` — only exists from Playwright **1.42**. On 1.40/1.41 the reporter reads
-it defensively and simply reports no native tags, because that Playwright has no such concept.
+They used to be 1.5MB and 750KB, and the run budget being *smaller* than the per-item cap was the
+tell: every attachment was base64-inlined into `/collect`'s 10MB body, competing with the test
+results, so the per-run number had to assume this process was one shard among many. It was a poor
+assumption either way — the cap is per process, and `collect` merges every shard into one request,
+so eleven shards each honouring 750KB still assembled a body over the limit and lost the whole
+launch to a 413.
 
-`qualflare.tag()` works on every supported version, so nothing is lost that the runner could have
-told us in the first place.
+`@qualflare/cli` v0.1.22+ uploads attachments through the presigned-URL flow and references a
+`storageKey`, so the body no longer grows with them. These numbers now only bound the report file on
+disk.
+
+**They require that CLI version.** An older one still inlines, and these limits would push it past
+the body limit — the failure this change exists to remove. They stay bounded rather than unlimited
+so the worst case is one launch rather than an out-of-memory.
 
 ## Test identity
 
 `Case.id` is Playwright's own `TestCase.id`, a hash of file + title + project. That means the same
 test running under two projects is two cases (correctly — they can fail independently), but also
 that **renaming a test or moving its file breaks its flaky-trend history**, since the id changes.
+
+## Not limitations of this reporter
+
+Things Playwright itself does not do. They are recorded here because people ask why a Playwright launch
+looks different from the other reporters' — not because anything is being withheld. Each would need
+a change in Playwright, not here.
+
+**Native `tag` needs Playwright 1.42+.** The `tag` option on `test()`/`test.describe()` does not
+exist below 1.42, and the peer floor is 1.40, so on 1.40/1.41 there is no native tag array to read.
+`qualflare.tag()` works throughout; upgrading is what gets you the native ones.
