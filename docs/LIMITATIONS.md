@@ -122,14 +122,22 @@ Two consequences worth knowing:
   retrying more than fifty times is pathological; the launch still succeeds and `retryCount` still
   reflects the true total.
 
-## `parameter()` outside a step has no masking
+## `parameter()` masking redacts the value
 
-`qualflare.parameter(name, value, { masked: true })` inside an open `qualflare.step()` attaches to
-that step and carries the masking hint. Outside any step, the parameter lands in `Case.properties`,
-which has no masking concept — the value is stored as-is.
+`{ masked: true }` drops the value before the report is written. The secret never leaves this
+process, so it is not stored server-side and cannot be read back through the API.
 
-`masked` is a **display hint for the UI in either case**. The server does not redact the value, and
-neither does this reporter. Do not pass a real secret expecting it to be protected.
+Inside a step, the parameter travels as `{ name, masked: true }` with no value, and the Qualflare UI
+renders `••••••` from the flag. Outside any step it lands in the case's `properties`, a flat
+`Record<string, string>` with nowhere to put the flag — so the value itself becomes `••••••`.
+Either way the report carries no secret.
+
+**The value is unrecoverable.** That is the point, but it is worth stating: masking is not a display
+toggle you can undo later. Mask a value you may need to read back and it is gone.
+
+This used to be a display hint only — the real value was sent, stored in plaintext and readable
+through the API, while the UI drew dots over it. Anyone who trusted the name got no protection at
+all, which is why the docs had to say "never put a real secret in one". They no longer do.
 
 ## Per-case and per-attachment caps are independent, not pooled
 

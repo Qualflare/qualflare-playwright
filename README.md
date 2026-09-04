@@ -122,9 +122,11 @@ wrong value cannot fail at test time — the reporter makes no requests — so t
 
 - **`merge-reports` mode is not supported** — use the `outputDir` flow above rather than
   Playwright's `blob` reporter.
-- **`parameter()` outside a step is not masked** — `masked` is a display hint for the UI; the
-  server never redacts the value, so never put a real secret in one. See
-  [`docs/LIMITATIONS.md`](./docs/LIMITATIONS.md#parameter-outside-a-step-has-no-masking).
+- **A masked `parameter()` value is redacted, not recoverable** — `{ masked: true }` now drops the
+  value before the report is written, so the secret never leaves the machine. Outside a step it
+  becomes `••••••` in the case's `properties`, which is a flat map with nowhere to put the flag.
+  There is no way to read the real value back afterwards. See
+  [`docs/LIMITATIONS.md`](./docs/LIMITATIONS.md#parameter-masking-redacts-the-value).
 - **Attachment caps are two budgets, not one pool** — `maxAttachmentBytes` bounds a single
   attachment and `maxTotalAttachmentBytes` the whole run; anything over either is dropped
   outright rather than truncated. Raising them is the easiest way to push a request past

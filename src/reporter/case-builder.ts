@@ -23,6 +23,7 @@ import type { Attachment, Attempt, Case, CaseStatus, Label, Link, Parameter, Ste
 import type { RuntimeMessage } from '../runtime/message-types.js';
 import { AttachmentBudget, inlineFromBuffer, inlineFromFile } from './attachment-reader.js';
 import { mapSteps } from './step-mapper.js';
+import { buildParameter, propertyValue } from '../shared/parameters.js';
 
 /**
  * Maps Playwright's 5 result statuses onto the wire contract's vocabulary.
@@ -255,11 +256,7 @@ function replayMetadata(
         meta.priority = message.value;
         break;
       case 'parameter': {
-        const param: Parameter = {
-          name: message.name,
-          ...(message.value !== undefined ? { value: message.value } : {}),
-          ...(message.masked ? { masked: true } : {}),
-        };
+        const param: Parameter = buildParameter(message.name, message.value, message.masked);
         const openStep = openSteps[openSteps.length - 1];
         if (openStep === undefined) {
           meta.caseParameters.push(param);
@@ -372,7 +369,7 @@ export function buildCase(
     ...(projectName ? { project: projectName } : {}),
   };
   for (const p of meta.caseParameters) {
-    properties[p.name] = p.value ?? '';
+    properties[p.name] = propertyValue(p.value, p.masked);
   }
 
   const attachments = [...(attachmentsByResult.get(`${test.id}:${final.retry}`) ?? []), ...meta.attachments];
