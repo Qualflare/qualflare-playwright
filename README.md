@@ -120,15 +120,9 @@ wrong value cannot fail at test time — the reporter makes no requests — so t
 
 ## Known limitations
 
-- **Traces need `--upload-artifacts=trace` at collect time.** The zip is copied into `outputDir`,
-  but `qf collect` uploads no heavy artifact unless asked — pass `--upload-artifacts=trace` (or
-  `video,trace`). Needs `@qualflare/cli` v0.1.20+; older CLIs ignore it.
 - **`pw:api` and `fixture` steps are filtered out by default** (`includeApiSteps`) — a single
   browser test emits hundreds, which buries the steps you actually wrote. A *failed* one is always
   kept.
-- **A stale `outputDir` is refused, not merged** — each report carries a `runId`, and `qf collect`
-  errors rather than merging files from two different runs. Needs `@qualflare/cli` v0.1.19+; older
-  CLIs merge as before.
 - **`merge-reports` mode is not supported** — use the `outputDir` flow above rather than
   Playwright's `blob` reporter.
 - **Playwright-native `tag` needs 1.42+** while the peer floor is 1.40 — on 1.40/1.41 the

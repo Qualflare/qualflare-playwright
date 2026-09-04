@@ -68,25 +68,29 @@ sharing a directory never overwrite each other.
 Requires [`@qualflare/cli`](https://github.com/Qualflare/qualflare-cli) **v0.1.17 or newer** — the
 first release that preserves `labels`/`links` and step nesting through `collect`.
 
-### Stale files are refused, not merged
+### A leftover report does not need clearing
 
 Each report carries `metadata.runId` — the identifier every shard of one run shares and different
-runs do not (`GITHUB_RUN_ID`, `CI_PIPELINE_ID`, and so on; a per-process UUID outside CI). If
-`collect` finds files from more than one run it refuses to upload and names them:
+runs do not (`GITHUB_RUN_ID`, `CI_PIPELINE_ID`, and so on; a per-process UUID outside CI). When
+`collect` finds files from more than one run it uploads the run that just finished and says what it
+left out:
 
 ```
-Error: 2 different runs found in the report files:
-    run 17244102887: 1 file(s)  (stale.json)
-    run 17244981923: 2 file(s)  (shard-0.json, shard-1.json)
-  A stale file from an earlier run would be merged into this launch.
-  Clear the output directory before each run, or pass --allow-mixed-runs to upload anyway
+ignored 1 file(s) from 1 earlier run(s) (--allow-mixed-runs to include them)
+Processing 2 test result file(s)...
+OK Test results collected successfully
 ```
 
-Clearing `outputDir` at the start of each run is still the tidier habit — in CI it is usually free,
-since the workspace is fresh — but forgetting now costs a failed upload rather than a launch
-quietly containing results nobody ran.
+Nothing is deleted — the older files stay on disk, they are simply not uploaded.
+`--allow-mixed-runs` merges every run into one launch instead, which is occasionally what you want
+when several tools write into one directory.
 
-Needs `@qualflare/cli` v0.1.19 or newer. An older CLI ignores `runId` and merges as before.
+There was a period where this was stricter than it needed to be: `collect` refused the whole upload
+and left you to clear the directory by hand. Before that it merged the stale file silently, which
+produced a launch that looked entirely plausible and contained results nobody ran.
+
+**On `@qualflare/cli` older than v0.1.21 you get one of those two older behaviours** — a refusal on
+v0.1.19–v0.1.20, and a silent merge before that.
 
 ### `merge-reports` mode is not supported
 
