@@ -141,17 +141,18 @@ attachment is a row a user can see but never open.
 Videos are exempt from the inline budget: they are copied to disk rather than inlined, and bounded
 separately by `maxVideoBytes`.
 
-## Playwright-native tags need 1.42+
-
-`TestCase.tags` — the `@token`s Playwright parses out of test titles and the `tag` option on
-`test()`/`test.describe()` — only exists from Playwright **1.42**. On 1.40/1.41 the reporter reads
-it defensively and simply reports no native tags, because that Playwright has no such concept.
-
-`qualflare.tag()` works on every supported version, so nothing is lost that the runner could have
-told us in the first place.
-
 ## Test identity
 
 `Case.id` is Playwright's own `TestCase.id`, a hash of file + title + project. That means the same
 test running under two projects is two cases (correctly — they can fail independently), but also
 that **renaming a test or moving its file breaks its flaky-trend history**, since the id changes.
+
+## Not limitations of this reporter
+
+Things Playwright itself does not do. They are recorded here because people ask why a Playwright launch
+looks different from the other reporters' — not because anything is being withheld. Each would need
+a change in Playwright, not here.
+
+**Native `tag` needs Playwright 1.42+.** The `tag` option on `test()`/`test.describe()` does not
+exist below 1.42, and the peer floor is 1.40, so on 1.40/1.41 there is no native tag array to read.
+`qualflare.tag()` works throughout; upgrading is what gets you the native ones.

@@ -120,13 +120,8 @@ wrong value cannot fail at test time — the reporter makes no requests — so t
 
 ## Known limitations
 
-- **`pw:api` and `fixture` steps are filtered out by default** (`includeApiSteps`) — a single
-  browser test emits hundreds, which buries the steps you actually wrote. A *failed* one is always
-  kept.
 - **`merge-reports` mode is not supported** — use the `outputDir` flow above rather than
   Playwright's `blob` reporter.
-- **Playwright-native `tag` needs 1.42+** while the peer floor is 1.40 — on 1.40/1.41 the
-  native tag array is not read; `qualflare.tag()` works throughout.
 - **`parameter()` outside a step is not masked** — `masked` is a display hint for the UI; the
   server never redacts the value, so never put a real secret in one. See
   [`docs/LIMITATIONS.md`](./docs/LIMITATIONS.md#parameter-outside-a-step-has-no-masking).
