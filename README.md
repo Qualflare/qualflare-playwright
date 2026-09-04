@@ -127,11 +127,11 @@ wrong value cannot fail at test time — the reporter makes no requests — so t
   becomes `••••••` in the case's `properties`, which is a flat map with nowhere to put the flag.
   There is no way to read the real value back afterwards. See
   [`docs/LIMITATIONS.md`](./docs/LIMITATIONS.md#parameter-masking-redacts-the-value).
-- **Attachment caps are two budgets, not one pool** — `maxAttachmentBytes` bounds a single
-  attachment and `maxTotalAttachmentBytes` the whole run; anything over either is dropped
-  outright rather than truncated. Raising them is the easiest way to push a request past
-  `/collect`'s body limit. See
-  [`docs/LIMITATIONS.md`](./docs/LIMITATIONS.md#per-case-and-per-attachment-caps-are-independent-not-pooled).
+- **Attachment caps still exist, but no longer risk the launch** — `maxAttachmentBytes` (5MB)
+  bounds one attachment and `maxTotalAttachmentBytes` (10MB) the whole run; anything over either is
+  dropped. Needs `@qualflare/cli` v0.1.22+, which uploads attachments out of band — on an older CLI
+  these limits can push the request past the server's body limit and fail the whole launch. See
+  [`docs/LIMITATIONS.md`](./docs/LIMITATIONS.md#attachment-caps).
 - **Retries carry per-attempt errors, but everything else is the final attempt** — `Case.attempts`
   records each attempt's status, duration and error; steps, labels, links, tags, priority,
   properties and attachments come from the last attempt only, so an abandoned attempt's step trace
