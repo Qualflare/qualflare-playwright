@@ -139,26 +139,21 @@ This used to be a display hint only — the real value was sent, stored in plain
 through the API, while the UI drew dots over it. Anyone who trusted the name got no protection at
 all, which is why the docs had to say "never put a real secret in one". They no longer do.
 
-## Attachment caps
+## Attachment caps need `@qualflare/cli` v0.1.22+
 
-`maxAttachmentBytes` (5MB) bounds a single attachment; `maxTotalAttachmentBytes` (10MB) bounds the
-run. Anything over either is dropped with a warning rather than truncated — a half-written screenshot
-is worse than none.
+`maxAttachmentBytes` (5MB) and `maxTotalAttachmentBytes` (10MB) are configurable — see
+[`CONFIGURATION.md`](./CONFIGURATION.md). Anything over either is skipped with a warning rather than
+truncated; a half-written screenshot is worse than none.
 
-They used to be 1.5MB and 750KB, and the run budget being *smaller* than the per-item cap was the
-tell: every attachment was base64-inlined into `/collect`'s 10MB body, competing with the test
-results, so the per-run number had to assume this process was one shard among many. It was a poor
-assumption either way — the cap is per process, and `collect` merges every shard into one request,
-so eleven shards each honouring 750KB still assembled a body over the limit and lost the whole
-launch to a 413.
+The **version requirement is the real constraint**, and it is not something this reporter can detect
+for you. From v0.1.22 the CLI uploads attachments through the presigned-URL flow and references a
+`storageKey`, so they no longer occupy `/collect`'s 10MB request body. On an older CLI they are still
+base64-inlined, and these limits are large enough to push a request past that body limit — which
+fails the entire launch, not just the attachment.
 
-`@qualflare/cli` v0.1.22+ uploads attachments through the presigned-URL flow and references a
-`storageKey`, so the body no longer grows with them. These numbers now only bound the report file on
-disk.
-
-**They require that CLI version.** An older one still inlines, and these limits would push it past
-the body limit — the failure this change exists to remove. They stay bounded rather than unlimited
-so the worst case is one launch rather than an out-of-memory.
+That failure is what the pairing exists to remove. It used to happen without anyone changing a
+setting: the caps are per process, `collect` merges every shard into one request, and eleven shards
+each honouring the old 750KB budget still assembled a body over the limit.
 
 ## Test identity
 
