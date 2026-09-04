@@ -122,11 +122,6 @@ wrong value cannot fail at test time — the reporter makes no requests — so t
 
 - **`merge-reports` mode is not supported** — use the `outputDir` flow above rather than
   Playwright's `blob` reporter.
-- **A masked `parameter()` value is redacted, not recoverable** — `{ masked: true }` now drops the
-  value before the report is written, so the secret never leaves the machine. Outside a step it
-  becomes `••••••` in the case's `properties`, which is a flat map with nowhere to put the flag.
-  There is no way to read the real value back afterwards. See
-  [`docs/LIMITATIONS.md`](./docs/LIMITATIONS.md#parameter-masking-redacts-the-value).
 - **Attachment caps still exist, but no longer risk the launch** — `maxAttachmentBytes` (5MB)
   bounds one attachment and `maxTotalAttachmentBytes` (10MB) the whole run; anything over either is
   dropped. Needs `@qualflare/cli` v0.1.22+, which uploads attachments out of band — on an older CLI
