@@ -5,6 +5,33 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.5.0
+
+### Changed
+
+- **`{ masked: true }` now redacts the value instead of only hinting at it.** The real value used to
+  be sent, stored server-side in plaintext and readable back through the API, while only the UI drew
+  dots over it — anyone who trusted the name got no protection. The value is now dropped before the
+  report is written, so the secret never leaves the machine. Inside a step the parameter travels as
+  `{ name, masked: true }`; outside one it becomes `••••••` in the case's `properties`.
+
+  **A masked value is now unrecoverable.** That is the point, but it is not a display toggle you can
+  undo later.
+
+- **Attachment caps raised** — `maxAttachmentBytes` 1.5MB → 5MB, `maxTotalAttachmentBytes`
+  750KB → 10MB. They were tight because every attachment was base64-inlined into `/collect`'s 10MB
+  body; `@qualflare/cli` v0.1.22+ uploads them out of band, so these now only bound the report file
+  on disk.
+
+  **Requires `@qualflare/cli` v0.1.22 or newer.** An older CLI still inlines, and these limits would
+  push the request past the server's body limit and fail the whole launch.
+
+- **`outputDir` no longer needs clearing between runs.** `qf collect` (v0.1.21+) uploads the run
+  that just finished and leaves an older one on disk rather than refusing the upload.
+
+- Known limitations now lists only what this reporter limits. Configurable defaults and things the
+  underlying framework does not do moved out — the latter to "Not limitations of this reporter".
+
 ## 0.4.1
 
 ### Changed
