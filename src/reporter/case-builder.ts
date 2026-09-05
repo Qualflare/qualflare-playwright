@@ -1,5 +1,3 @@
-import * as fs from 'node:fs';
-
 import type { TestCase, TestResult } from '@playwright/test/reporter';
 
 import type { ResolvedReporterConfig } from '../config/resolve-config.js';
