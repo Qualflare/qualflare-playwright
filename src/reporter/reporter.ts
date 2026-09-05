@@ -76,6 +76,15 @@ export default class QualflareReporter implements Reporter {
       const detectedShardIndex = config.shard ? config.shard.current - 1 : undefined;
 
       this.config = resolveConfig(this.options, { detectedShardIndex });
+      // Resolve outputDir ONCE, here, so every consumer sees the same absolute
+      // path. It used to be resolved only where the JSON is written, while the
+      // video, trace and screenshot writers each took the raw config string --
+      // which resolves against the CWD, not the config file. Run
+      // `playwright test --config e2e/playwright.config.ts` from a repo root
+      // with a relative outputDir and the report lands next to the config while
+      // every artifact lands somewhere else entirely, leaving localVideoPath /
+      // localImagePath pointing at files the CLI cannot find.
+      this.config.outputDir = this.resolveOutputDir(this.config.outputDir);
       this.budget = new AttachmentBudget(this.config.maxTotalAttachmentBytes);
 
       for (const project of config.projects) {
@@ -165,7 +174,8 @@ export default class QualflareReporter implements Reporter {
       }
     }
 
-    const outputDir = this.resolveOutputDir(config.outputDir);
+    // Already absolute -- resolved once in onBegin.
+    const outputDir = config.outputDir;
 
     fs.mkdirSync(outputDir, { recursive: true });
     const outputPath = path.join(outputDir, `${randomUUID()}.json`);
@@ -175,7 +185,12 @@ export default class QualflareReporter implements Reporter {
 
   /** Relative `outputDir` resolves against the Playwright config's own
    * directory, not the shell's cwd — a user running `npx playwright test`
-   * from a monorepo root should still write next to their config. */
+   * from a monorepo root should still write next to their config.
+   *
+   * Called exactly once, from `onBegin`, so `config.outputDir` is absolute
+   * everywhere downstream. Do not resolve again at a use site: a second
+   * resolution is what let the report and its artifacts land in different
+   * directories. */
   private resolveOutputDir(outputDir: string): string {
     return path.isAbsolute(outputDir) ? outputDir : path.resolve(this.options.configDir ?? this.rootDir, outputDir);
   }

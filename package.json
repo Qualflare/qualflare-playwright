@@ -76,6 +76,9 @@
     "test": "vitest run test/unit",
     "test:integration": "vitest run test/integration --pool=forks --testTimeout=120000",
     "test:all": "npm run test && npm run test:integration",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test:e2e": "playwright test --config e2e/playwright.config.ts",
+    "verify:e2e": "node e2e/verify-report.mjs",
+    "e2e": "npm run test:e2e && npm run verify:e2e"
   }
 }
