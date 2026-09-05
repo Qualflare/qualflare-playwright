@@ -14,3 +14,9 @@ examples/**/node_modules/
 examples/**/test-results/
 examples/**/playwright-report/
 examples/**/qualflare-results/
+
+# Dogfood suite output (e2e/) — the report plus any screenshots it writes.
+e2e-results/
+# Playwright's own artifact dir for the dogfood suite (distinct from the
+# reporter's outputDir above).
+e2e/.artifacts/
