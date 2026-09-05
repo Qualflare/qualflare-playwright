@@ -83,7 +83,6 @@ export function resolveAttachments(
   }
 
   const out: Attachment[] = [];
-  let capWarned = false;
 
   for (const a of result.attachments) {
     // Runtime messages from the metadata API travel as attachments; they are
@@ -93,10 +92,8 @@ export function resolveAttachments(
     }
 
     if (out.length >= MAX_ATTACHMENTS_PER_CASE) {
-      if (!capWarned) {
-        capWarned = true;
-        logger.warn(`a test produced more than ${MAX_ATTACHMENTS_PER_CASE} attachments; the rest were dropped.`);
-      }
+      // No warn-once latch: the loop breaks here, so this runs at most once per case.
+      logger.warn(`a test produced more than ${MAX_ATTACHMENTS_PER_CASE} attachments; the rest were dropped.`);
       break;
     }
 
