@@ -22,6 +22,7 @@ import { logger } from '../shared/logger.js';
 import type { Attachment, Attempt, Case, CaseStatus, Label, Link, Parameter, Step } from '../shared/types.js';
 import type { RuntimeMessage } from '../runtime/message-types.js';
 import { AttachmentBudget, inlineFromBuffer, inlineFromFile } from './attachment-reader.js';
+import { copyImageAttachment, isOffloadableImage, writeImageAttachment } from './video-writer.js';
 import { mapSteps } from './step-mapper.js';
 import { buildParameter, propertyValue } from '../shared/parameters.js';
 
@@ -270,19 +271,47 @@ function replayMetadata(
       case 'attachment': {
         // Decoded back to bytes rather than trusting the base64 length, so the
         // cap is applied to the real payload size the server will receive.
-        const inlined = inlineFromBuffer(
-          message.name,
-          Buffer.from(message.contentBase64, 'base64'),
-          message.mimeType,
-          config,
-          budget,
-        );
+        const bytes = Buffer.from(message.contentBase64, 'base64');
+        // An image written by qualflare.attachment() goes out of band like any
+        // other screenshot. Leaving it inline would make the metadata API the
+        // one remaining source of base64 image bytes in the report, which is
+        // exactly what this removes.
+        if (isOffloadableImage(message.mimeType)) {
+          const written = writeImageAttachment(
+            bytes,
+            message.mimeType,
+            config.outputDir,
+            config.maxAttachmentBytes,
+          );
+          if (written) {
+            meta.attachments.push({
+              name: message.name,
+              mimeType: written.mimeType,
+              localImagePath: written.localImagePath,
+              fileSize: written.fileSize,
+            });
+            break;
+          }
+          // Fall through to inline rather than dropping it: an unwritable
+          // outputDir should cost the offload, not the user's attachment.
+        }
+        const inlined = inlineFromBuffer(message.name, bytes, message.mimeType, config, budget);
         if (inlined) {
           meta.attachments.push(inlined);
         }
         break;
       }
       case 'attachment_from_file': {
+        const copied = copyImageAttachment(message.path, config.outputDir, config.maxAttachmentBytes);
+        if (copied) {
+          meta.attachments.push({
+            name: message.name,
+            mimeType: copied.mimeType,
+            localImagePath: copied.localImagePath,
+            fileSize: copied.fileSize,
+          });
+          break;
+        }
         const fromFile = inlineFromFile(message.name, message.path, message.mimeType, config, budget);
         if (fromFile) {
           meta.attachments.push(fromFile);
