@@ -24,12 +24,15 @@ Two things to know:
 `fs.statSync` before anything is copied. Traces still work normally in Playwright itself either way —
 `npx playwright show-trace` is unaffected.
 
-## Videos are written, not uploaded
+## Artifacts are written, not uploaded
 
-Video attachments are copied into `outputDir` next to the report file and referenced by
-`localVideoPath`. `qualflare-cli` uploads them at collect time and resolves each into a real
-`storageKey`. Screenshots take the other path — inlined as base64 `content` — because they are small
-enough to fit the wire contract's caps.
+Videos, traces and screenshots are all copied into `outputDir` next to the report file and referenced
+by `localVideoPath`, `localTracePath` and `localImagePath`. `qualflare-cli` uploads them at collect
+time and resolves each into a real `storageKey`; this reporter never makes a network call.
+
+Screenshots used to take the other path — inlined as base64 `content` — which put them inside
+`/collect`'s request body and made them compete with the results for it. They now travel like
+everything else, and only text attachments (logs, JSON, markdown) still inline.
 
 Controlled by `maxVideoBytes` (default 50MB, matching the server's own cap, checked before anything
 is copied). A video that can't be written is skipped with a warning; it never fails a run.
