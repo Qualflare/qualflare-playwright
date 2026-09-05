@@ -21,7 +21,7 @@ npm install --save-dev @qualflare/playwright
 
 Requires `@playwright/test` `>=1.40.0` (installed separately as a peer dependency) and Node `>=18`
 (Playwright 1.62+ itself requires Node `>=20`). You also need
-[`@qualflare/cli`](https://github.com/Qualflare/qualflare-cli) **v0.1.17 or newer** to upload what
+[`@qualflare/cli`](https://github.com/Qualflare/qualflare-cli) **v0.1.24 or newer** to upload what
 this reporter writes.
 
 The peer range is deliberately open-ended rather than capped at a known-good version, so a new
@@ -58,11 +58,18 @@ npx playwright test
 qf <your-project-identifier> collect ./qualflare-results
 ```
 
-> **Videos and traces are opt-in from `@qualflare/cli` v0.1.20.** `collect` uploads the report
-> itself always, but a heavy artifact only when asked: `--upload-artifacts=video`, `=trace`, or
-> `=video,trace` (or `QF_UPLOAD_ARTIFACTS`). Earlier CLI versions uploaded every video
-> automatically. Nothing is dropped silently — `collect` prints how many artifacts it skipped and
-> the exact flag to include them.
+> **Requires `@qualflare/cli` v0.1.24 or newer.** Screenshots are written into `outputDir` and
+> referenced by name (`localImagePath`) instead of being base64-inlined into the report, the same
+> way videos and traces already were. An older CLI does not read the field, and because such an
+> attachment carries neither content nor a storage key the server records it from its name alone —
+> an undownloadable placeholder. Upgrade the CLI before upgrading this reporter.
+>
+> **Videos and traces are opt-in; screenshots are not.** `collect` uploads the report and the
+> screenshots always, but a heavy artifact only when asked: `--upload-artifacts=video`, `=trace`, or
+> `=video,trace` (or `QF_UPLOAD_ARTIFACTS`). Named kinds are *added* to that default, so asking for
+> video does not turn screenshots off; `--upload-artifacts=none` declines everything, screenshots
+> included. Nothing is dropped silently — `collect` prints how many artifacts it skipped and the
+> exact flag to include them.
 
 ### Sharded CI
 

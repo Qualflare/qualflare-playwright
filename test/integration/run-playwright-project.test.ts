@@ -138,10 +138,22 @@ describe('qualflare-playwright against a real playwright run', () => {
       expect(browserCase).toBeDefined();
       const byName = (n: string) => browserCase.attachments.find((a: { name: string }) => a.name === n);
 
+      // A screenshot now travels the same way a video does: written into
+      // outputDir and referenced by name, never base64 in the report.
       const screenshot = byName('screenshot');
       expect(screenshot.mimeType).toBe('image/png');
-      expect(typeof screenshot.content).toBe('string'); // inline base64
+      expect(screenshot.content).toBeUndefined();
+      expect(typeof screenshot.localImagePath).toBe('string');
       expect(screenshot.localVideoPath).toBeUndefined();
+      const shotPath = path.join(outputDir, screenshot.localImagePath);
+      expect(fs.existsSync(shotPath)).toBe(true);
+      expect(screenshot.fileSize).toBe(fs.statSync(shotPath).size);
+      // The file has to be a real PNG, not just named one: the upload endpoint
+      // cross-checks the extension against the MIME type it is handed.
+      expect(fs.readFileSync(shotPath).subarray(0, 8)).toEqual(
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      );
+      expect(screenshot.storageKey).toBeUndefined();
 
       const video = byName('video');
       expect(video.mimeType).toBe('video/webm');

@@ -133,3 +133,113 @@ export function copyTraceAttachment(
   }
   return { localTracePath: copied.localPath, fileSize: copied.fileSize, mimeType: TRACE_MIME_TYPE };
 }
+
+/** Extension -> MIME for the image formats the upload endpoint accepts. An
+ * image outside this set (`.bmp`, `.svg`, a screenshot some plugin renamed) has
+ * nowhere to go out of band and is left to the inline path, which is bounded by
+ * `maxAttachmentBytes` and still works. */
+const IMAGE_MIME_TYPES_BY_EXTENSION: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+};
+
+/** MIME -> extension, for buffers that carry a type but no filename. */
+const IMAGE_EXTENSIONS_BY_MIME: Record<string, string> = {
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/gif': '.gif',
+};
+
+export interface ImageWriteResult {
+  /** Filename relative to `outputDir`, same rule as `localVideoPath`. */
+  localImagePath: string;
+  fileSize: number;
+  mimeType: string;
+}
+
+/** Whether this MIME type can travel out of band as an image at all.
+ *
+ * A type predicate rather than a plain boolean so a caller holding
+ * `string | undefined` is narrowed by the check, instead of having to assert
+ * the type back afterwards. */
+export function isOffloadableImage(mimeType: string | undefined): mimeType is string {
+  return mimeType !== undefined && mimeType in IMAGE_EXTENSIONS_BY_MIME;
+}
+
+/**
+ * Copies one screenshot into `outputDir` and returns enough to build that
+ * `Attachment` entry's `localImagePath`.
+ *
+ * The MIME type is derived from the EXTENSION, not from the attachment's
+ * declared `contentType`. Playwright names its auto-screenshot attachment
+ * "screenshot" with no extension, and the server's upload endpoint cross-checks
+ * the filename's extension against the MIME type it was given — so trusting a
+ * declared type that disagrees with the file on disk earns a 400 per
+ * screenshot.
+ *
+ * Requires `@qualflare/cli` v0.1.24+, which is what reads `localImagePath`. An
+ * older CLI ignores the field, leaving an attachment with neither content nor
+ * storageKey — a row the server persists from its name alone, showing as an
+ * undownloadable placeholder. That is why this reporter's README states the
+ * version floor.
+ */
+export function copyImageAttachment(
+  filePath: string,
+  outputDir: string,
+  maxImageBytes: number,
+): ImageWriteResult | undefined {
+  const ext = path.extname(filePath).toLowerCase();
+  const mimeType = IMAGE_MIME_TYPES_BY_EXTENSION[ext];
+  if (!mimeType) {
+    // Not a warning: this is the ordinary path for a .bmp or a .txt, which the
+    // caller then inlines. Warning here would fire on every non-image
+    // attachment in the run.
+    return undefined;
+  }
+
+  const copied = copyArtifact(filePath, outputDir, maxImageBytes, ext, 'maxAttachmentBytes', 'image');
+  if (!copied) {
+    return undefined;
+  }
+  return { localImagePath: copied.localPath, fileSize: copied.fileSize, mimeType };
+}
+
+/**
+ * Writes an in-memory screenshot into `outputDir`, for `testInfo.attach()` and
+ * `qualflare.attachment()` which hand over a Buffer rather than a path.
+ *
+ * Unlike video and trace, an in-memory image is worth writing out rather than
+ * refusing: it is small, it is the shape the metadata API produces, and
+ * refusing would push every programmatic screenshot back onto the inline path
+ * this change exists to empty.
+ */
+export function writeImageAttachment(
+  bytes: Buffer,
+  mimeType: string,
+  outputDir: string,
+  maxImageBytes: number,
+): ImageWriteResult | undefined {
+  const ext = IMAGE_EXTENSIONS_BY_MIME[mimeType];
+  if (!ext) {
+    return undefined;
+  }
+  if (bytes.length > maxImageBytes) {
+    logger.warn(
+      `skipping image attachment: ${bytes.length} bytes exceeds the configured ` +
+        `maxAttachmentBytes cap of ${maxImageBytes} bytes.`,
+    );
+    return undefined;
+  }
+
+  const localImagePath = `${randomUUID()}${ext}`;
+  try {
+    fs.mkdirSync(outputDir, { recursive: true });
+    fs.writeFileSync(path.join(outputDir, localImagePath), bytes);
+  } catch (err) {
+    logger.warn(`skipping image attachment: could not write file: ${(err as Error).message}`);
+    return undefined;
+  }
+  return { localImagePath, fileSize: bytes.length, mimeType };
+}
