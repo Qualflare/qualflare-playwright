@@ -127,6 +127,17 @@ export interface Attachment {
    * it. Read by `@qualflare/cli` v0.1.20+, which uploads it only when
    * `--upload-artifacts=trace` asks; an older CLI ignores the field. */
   localTracePath?: string;
+  /** Filename of a screenshot copied into `outputDir`, relative to it — the
+   * image counterpart of `localVideoPath`, so a screenshot no longer has to be
+   * base64-inlined into the report and from there into the `/collect` body.
+   *
+   * Read by `@qualflare/cli` v0.1.24+, which uploads it out of band by default
+   * (images are the one artifact kind that is not opt-in). An OLDER CLI ignores
+   * the field, and because such an attachment carries neither `content` nor
+   * `storageKey` the server persists it from its name alone as an
+   * undownloadable placeholder — which is why the README states the floor.
+   * Mutually exclusive with `content`/`storageKey`. */
+  localImagePath?: string;
   /** Byte size of the object at `storageKey`. Ignored when `storageKey` is
    * unset. */
   fileSize?: number;

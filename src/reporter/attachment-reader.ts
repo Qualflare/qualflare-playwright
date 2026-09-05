@@ -6,7 +6,13 @@ import { MAX_ATTACHMENTS_PER_CASE, RESERVED_MESSAGE_MEDIA_TYPE } from '../shared
 import { logger } from '../shared/logger.js';
 import type { Attachment } from '../shared/types.js';
 import type { ResolvedReporterConfig } from '../config/resolve-config.js';
-import { copyTraceAttachment, copyVideoAttachment } from './video-writer.js';
+import {
+  copyImageAttachment,
+  copyTraceAttachment,
+  copyVideoAttachment,
+  isOffloadableImage,
+  writeImageAttachment,
+} from './video-writer.js';
 
 /** Running total of inline attachment bytes for one reporter process, so a
  * single pathological run can't push a launch past the server's body limit.
@@ -113,6 +119,16 @@ export function resolveAttachments(
       continue;
     }
 
+    // Images go out of band like video and traces, rather than base64 into the
+    // report. Placed AFTER the trace and video branches so a misnamed artifact
+    // cannot be captured here, and BEFORE the inline fallthrough so a
+    // screenshot never reaches it.
+    const image = imageAttachment(a, config);
+    if (image) {
+      out.push(image);
+      continue;
+    }
+
     if (isVideo(a)) {
       if (!a.path) {
         // An in-memory video is not something Playwright produces on its own
@@ -216,6 +232,45 @@ export function inlineFromFile(
     return undefined;
   }
   return inlineFromBuffer(name, bytes, mimeType, config, budget);
+}
+
+/**
+ * Routes a screenshot onto `localImagePath`, from a file or a Buffer.
+ *
+ * Returns undefined for anything that is not an offloadable image, which is the
+ * ordinary case for logs and JSON — the caller then inlines it exactly as
+ * before. Nothing is dropped here: a failure inside the writers already warns
+ * and falls back.
+ */
+function imageAttachment(
+  a: TestResult['attachments'][number],
+  config: ResolvedReporterConfig,
+): Attachment | undefined {
+  if (a.path) {
+    const copied = copyImageAttachment(a.path, config.outputDir, config.maxAttachmentBytes);
+    if (!copied) {
+      return undefined;
+    }
+    return {
+      name: a.name,
+      mimeType: copied.mimeType,
+      localImagePath: copied.localImagePath,
+      fileSize: copied.fileSize,
+    };
+  }
+  if (a.body && isOffloadableImage(a.contentType)) {
+    const written = writeImageAttachment(a.body, a.contentType, config.outputDir, config.maxAttachmentBytes);
+    if (!written) {
+      return undefined;
+    }
+    return {
+      name: a.name,
+      mimeType: written.mimeType,
+      localImagePath: written.localImagePath,
+      fileSize: written.fileSize,
+    };
+  }
+  return undefined;
 }
 
 function inlineAttachment(
