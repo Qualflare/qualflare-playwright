@@ -147,8 +147,10 @@ Steps nest, and nesting is preserved in the report via `parentIndex`.
 ## Playwright's own attachments are captured automatically
 
 You do not need `qualflare.attachment()` for anything Playwright already produces. Failure
-screenshots (`use.screenshot`) are inlined, videos (`use.video`) are copied and referenced for
-upload, and `testInfo.attach()` calls you make directly are picked up as ordinary attachments.
+screenshots (`use.screenshot`), videos (`use.video`) and traces (`use.trace`) are all copied into
+`outputDir` and referenced by name — `localImagePath`, `localVideoPath` and `localTracePath` — so
+`@qualflare/cli` uploads them out of band rather than inside the report. `testInfo.attach()` calls
+you make directly are picked up the same way when they are images, and inlined otherwise.
 
-Traces are the exception — they are deliberately not attached. See
-[`LIMITATIONS.md`](./LIMITATIONS.md).
+Videos and traces only upload when you ask (`--upload-artifacts=video`, `=trace`); screenshots
+upload by default. See [`LIMITATIONS.md`](./LIMITATIONS.md).
