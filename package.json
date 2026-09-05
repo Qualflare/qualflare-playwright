@@ -1,6 +1,6 @@
 {
   "name": "@qualflare/playwright",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Native Playwright reporter for the Qualflare test-management platform.",
   "keywords": [
     "qualflare",
