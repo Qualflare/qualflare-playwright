@@ -12,7 +12,7 @@
     "flaky-tests",
     "test-reporting"
   ],
-  "homepage": "https://qualflare.com",
+  "homepage": "https://qualflare.com/playwright-test-reporting/",
   "bugs": {
     "url": "https://github.com/Qualflare/qualflare-playwright/issues"
   },
