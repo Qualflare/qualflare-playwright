@@ -14,9 +14,26 @@ import {
   writeImageAttachment,
 } from './video-writer.js';
 
-/** Running total of inline attachment bytes for one reporter process, so a
- * single pathological run can't push a launch past the server's body limit.
- * Identical to the class both sibling packages use. */
+/**
+ * Running total of ENCODED inline attachment bytes for this process, so a single
+ * pathological run can't push a launch past the server's body limit.
+ *
+ * Encoded, not raw, because base64 is what actually travels and what the limit is
+ * measured against. Counting raw bytes made the cap mean 4/3 more than it said: a
+ * fully-used 10,000,000-byte budget is 13,333,336 bytes of `content`, which is
+ * 1.27x `/collect`'s BodyLimit(10<<20) = 10,485,760. See `base64Length`.
+ */
+/**
+ * Length of `Buffer.toString("base64")` without producing it.
+ *
+ * base64 emits 4 characters per 3 input bytes, padded up. Computed arithmetically
+ * so the budget can be checked BEFORE a large buffer is encoded, rather than
+ * allocating the string only to discard it.
+ */
+export function base64Length(rawBytes: number): number {
+  return Math.ceil(rawBytes / 3) * 4;
+}
+
 export class AttachmentBudget {
   private used = 0;
 
@@ -178,9 +195,11 @@ export function inlineFromBuffer(
     );
     return undefined;
   }
-  if (!budget.tryReserve(bytes.byteLength)) {
+  const encoded = base64Length(bytes.byteLength);
+  if (!budget.tryReserve(encoded)) {
     logger.warn(
-      `skipping attachment "${name}": this run's total inline-attachment budget of ${config.maxTotalAttachmentBytes} bytes is exhausted.`,
+      `skipping attachment "${name}": this run's total inline-attachment budget of ${config.maxTotalAttachmentBytes} encoded bytes is exhausted ` +
+        `(this one needs ${encoded}, being ${bytes.byteLength} raw bytes as base64).`,
     );
     return undefined;
   }
