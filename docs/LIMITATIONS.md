@@ -58,58 +58,10 @@ tree. Nesting deeper than 10 levels stops deepening: those steps are still repor
 to the deepest ancestor within the cap rather than dropped. Playwright imposes no nesting limit, so
 this is a runaway guard, not a product decision.
 
-## Sharded CI: point every shard at the same `outputDir`
-
-Qualflare's `/collect` endpoint creates exactly one Launch per request. This reporter accumulates a
-whole `playwright test` process in memory and writes it as one uniquely-named JSON file at `onEnd`.
-It never uploads.
-
-Merging is entirely `qualflare-cli`'s job: point every shard at the same `outputDir` and run
-`qf <identifier> collect <outputDir>` once at the end. Because each file's name is a UUID, shards
-sharing a directory never overwrite each other.
-
-Requires [`@qualflare/cli`](https://github.com/Qualflare/qualflare-cli) **v0.1.17 or newer** — the
-first release that preserves `labels`/`links` and step nesting through `collect`.
-
-### A leftover report does not need clearing
-
-Each report carries `metadata.runId` — the identifier every shard of one run shares and different
-runs do not (`GITHUB_RUN_ID`, `CI_PIPELINE_ID`, and so on; a per-process UUID outside CI). When
-`collect` finds files from more than one run it uploads the run that just finished and says what it
-left out:
-
-```
-ignored 1 file(s) from 1 earlier run(s) (--allow-mixed-runs to include them)
-Processing 2 test result file(s)...
-OK Test results collected successfully
-```
-
-Nothing is deleted — the older files stay on disk, they are simply not uploaded.
-`--allow-mixed-runs` merges every run into one launch instead, which is occasionally what you want
-when several tools write into one directory.
-
-There was a period where this was stricter than it needed to be: `collect` refused the whole upload
-and left you to clear the directory by hand. Before that it merged the stale file silently, which
-produced a launch that looked entirely plausible and contained results nobody ran.
-
-**On `@qualflare/cli` older than v0.1.21 you get one of those two older behaviours** — a refusal on
-v0.1.19–v0.1.20, and a silent merge before that.
-
-### `merge-reports` mode is not supported
-
-Playwright has its own shard-merging flow (the `blob` reporter plus `npx playwright merge-reports`).
-This reporter is not designed to run inside it. Use the `outputDir` flow above instead.
-
-The blocker is worth recording for whoever adds it: in merge mode Playwright deliberately does
-**not** deduplicate projects — a project sharded across 5 machines appears as 5 distinct project
-objects in the config handed to `onBegin`. Any grouping logic must therefore key on `project.name`
-rather than object identity or array position.
-
 ## Retries: per-attempt error detail, final-attempt everything else
 
 `Case.attempts` carries each attempt's status, duration and error, so a retried test reports
 "attempt 1 failed with error X, attempt 2 passed" rather than collapsing to the final outcome.
-`@qualflare/cucumberjs` and `@qualflare/cypress` send the same structure.
 
 Everything *else* still comes from the final attempt: steps, labels, links, tags, description,
 priority, properties and attachments. That is deliberate rather than a schema limit. An abandoned
@@ -124,23 +76,6 @@ Two consequences worth knowing:
 - Past 50 attempts the server keeps the first 49 plus the final one and drops the middle. A test
   retrying more than fifty times is pathological; the launch still succeeds and `retryCount` still
   reflects the true total.
-
-## `parameter()` masking redacts the value
-
-`{ masked: true }` drops the value before the report is written. The secret never leaves this
-process, so it is not stored server-side and cannot be read back through the API.
-
-Inside a step, the parameter travels as `{ name, masked: true }` with no value, and the Qualflare UI
-renders `••••••` from the flag. Outside any step it lands in the case's `properties`, a flat
-`Record<string, string>` with nowhere to put the flag — so the value itself becomes `••••••`.
-Either way the report carries no secret.
-
-**The value is unrecoverable.** That is the point, but it is worth stating: masking is not a display
-toggle you can undo later. Mask a value you may need to read back and it is gone.
-
-This used to be a display hint only — the real value was sent, stored in plaintext and readable
-through the API, while the UI drew dots over it. Anyone who trusted the name got no protection at
-all, which is why the docs had to say "never put a real secret in one". They no longer do.
 
 ## Attachment caps need `@qualflare/cli` v0.1.22+
 
