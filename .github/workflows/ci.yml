@@ -13,7 +13,7 @@ jobs:
     name: Build, lint, typecheck, unit test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # Node 24, for its npm 11. Dependabot regenerates package-lock.json with
       # npm 11, which dedupes the wildcard `@types/node: *` that the framework
       # packages depend on; npm 10 (Node 20 and 22) then rejects that lockfile as
@@ -65,7 +65,7 @@ jobs:
             node: '22'
             os: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
@@ -92,7 +92,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: unit
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
