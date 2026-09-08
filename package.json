@@ -1,16 +1,16 @@
 {
   "name": "@qualflare/playwright",
   "version": "0.6.1",
-  "description": "Native Playwright reporter for the Qualflare test-management platform.",
+  "description": "Native Playwright reporter for Qualflare — captures status, per-attempt retry history, flakiness, test.step() trees, screenshots, videos, traces and metadata.",
   "keywords": [
     "qualflare",
     "playwright",
     "playwright-reporter",
     "test-reporter",
-    "e2e",
+    "test-reporting",
     "test-results",
     "flaky-tests",
-    "test-reporting"
+    "e2e"
   ],
   "homepage": "https://qualflare.com/playwright-test-reporting/",
   "bugs": {
