@@ -1,6 +1,6 @@
 {
   "name": "@qualflare/playwright",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Native Playwright reporter for Qualflare — captures status, per-attempt retry history, flakiness, test.step() trees, screenshots, videos, traces and metadata.",
   "keywords": [
     "qualflare",
