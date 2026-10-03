@@ -20,7 +20,7 @@ jobs:
     name: Publish @qualflare/playwright
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write # create the GitHub Release after the npm publish
       id-token: write # npm provenance attestations via Sigstore OIDC
     steps:
       - uses: actions/checkout@v7
@@ -52,3 +52,15 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish
+
+      # Created with the workflow's own token, so the release is published by
+      # github-actions[bot]. Notes come from this version's CHANGELOG.md section,
+      # so they never carry an author login.
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v v="$VERSION" '/^## /{p=($2==v)} p' CHANGELOG.md > release-notes.md
+          [ -s release-notes.md ] || echo "Release $GITHUB_REF_NAME" > release-notes.md
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file release-notes.md --verify-tag

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.3
+
+No code change. Re-publishes 0.6.2 under a new version so the release is created
+by the automated pipeline, and the GitHub Release page now exists alongside the
+npm package.
+
 ## 0.6.2
 
 Package metadata only — no code change, and nothing to do if you are already on
